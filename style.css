@@ -133,3 +133,7 @@ a:hover{color:var(--green-d)}
 select option{color:var(--ink);background:var(--card)}
 ::selection{background:var(--gold);color:#22302a}
 body.dark input,body.dark textarea,body.dark select{color-scheme:dark}
+
+/* bouton copier */
+.copy-btn{margin-top:8px;background:var(--soft);border:1px solid var(--line);border-radius:8px;padding:5px 12px;font:inherit;font-size:.85rem;cursor:pointer;color:var(--ink)}
+.copy-btn:hover{border-color:var(--green)}

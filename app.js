@@ -228,6 +228,22 @@ async function fixLeaksOnline(ana){
   return ana;
 }
 
+/* ---------- bouton copier ---------- */
+function copyBtn(text){
+  const b=document.createElement("button");
+  b.className="copy-btn"; b.textContent="📋 "+T("copy"); b.title=T("copy");
+  b.addEventListener("click",()=>{
+    const done=()=>{b.textContent="✓ "+T("copied"); setTimeout(()=>{b.textContent="📋 "+T("copy");},1600);};
+    const fallback=()=>{const ta=document.createElement("textarea");ta.value=text;
+      document.body.appendChild(ta);ta.select();
+      try{document.execCommand("copy");done();}catch(e){} ta.remove();};
+    if(navigator.clipboard&&navigator.clipboard.writeText)
+      navigator.clipboard.writeText(text).then(done,fallback);
+    else fallback();
+  });
+  return b;
+}
+
 /* ---------- onglets ---------- */
 document.querySelectorAll("#tabs button[data-tab]").forEach(b=>{
   b.addEventListener("click",()=>{
@@ -389,6 +405,7 @@ async function doTranslate(){
         try{ pivot=await gtx("ru",dst,await gtx(src,"ru",qmt)); }catch(e){}
       }
       if(!direct&&!pivot) throw new Error("aucune réponse");
+      let copyTarget="";
       let html=`<h2>${T("cardMT")} <span class="badge b-low">${T("badgeMT")}</span></h2>`;
       if(dst==="ce"){
         const cands=[[T("mtDirect"),direct],[T("mtPivot"),pivot]].filter(c=>c[1])
@@ -397,6 +414,7 @@ async function doTranslate(){
         cands.sort((a,b)=>(a[2].leaks+a[2].unknown)-(b[2].leaks+b[2].unknown));
         const [name,raw,anaRaw]=cands[0];
         const ana=await fixLeaksOnline(anaRaw);
+        copyTarget=ana.text;
         html+=`<p class="ce" style="font-size:1.15rem;font-weight:600">${esc(ana.text)}</p>
           <p class="lat">${esc(translit(ana.text))}</p>`;
         if(ana.subs.length){
@@ -409,6 +427,7 @@ async function doTranslate(){
         }
       }else{
         const main=direct||pivot;
+        copyTarget=main;
         html+=`<p style="font-size:1.1rem;font-weight:600">${esc(main)}</p>
           ${isCyr(main)?`<p class="lat">${esc(translit(main))}</p>`:""}`;
         if(pivot&&direct&&pivot!==direct) html+=`<p class="hint">${T("viaRu")} : ${esc(pivot)}</p>`;
@@ -416,6 +435,7 @@ async function doTranslate(){
       if(q.length>1800) html+=`<p class="hint">${T("mtLong")}</p>`;
       html+=`<p class="warn">${T("mtWarn")}</p>`;
       box.innerHTML=html;
+      if(copyTarget) box.appendChild(copyBtn(copyTarget));
     }catch(e){
       const gl=`https://translate.google.com/?sl=${src}&tl=${dst}&text=${encodeURIComponent(q)}`;
       box.innerHTML=`<h2>${T("cardMT")}</h2>
@@ -733,6 +753,7 @@ const I18N={
   impNone:"Aucun texte détecté. S'il s'agit d'un scan, cochez « forcer l'OCR ».",err:"Erreur : ",ocrModel:"Téléchargement du modèle OCR…",
   "cat:Salutations":"Salutations","cat:Politesse":"Politesse","cat:Base":"Base","cat:Conversation":"Conversation","cat:Langue":"Langue","cat:Sentiments":"Sentiments",
   numN:"Nombre",numCE:"Tchétchène",numTL:"Translit.",numST:"Structure",
+  install:"Installer",copy:"Copier",copied:"Copié !",installHow:"Pour installer l\u2019application :\niPhone/iPad : Safari \u2192 bouton Partager \u2192 \u00ab Sur l\u2019\u00e9cran d\u2019accueil \u00bb.\nAndroid/PC : menu du navigateur \u2192 \u00ab Installer l\u2019application \u00bb.",
   aboutHtml:`<h2>Noxchiyn Mott — Нохчийн мотт</h2>
    <p>Dictionnaire et traducteur pour la langue tchétchène, construit à partir de sources publiées et vérifiables. Chaque résultat affiche sa source :</p>
    <p><span class="badge b-high">dictionnaire</span> dictionnaires publiés (Wiktionary, Matsiev…) · <span class="badge b-mid">Manuel</span> méthodes de langue · <span class="badge b-low">MT en ligne</span> traduction automatique, à vérifier.</p>
@@ -763,6 +784,7 @@ const I18N={
   impNone:"Текст не обнаружен. Если это скан, включите «принудительный OCR».",err:"Ошибка: ",ocrModel:"Загрузка модели OCR…",
   "cat:Salutations":"Приветствия","cat:Politesse":"Вежливость","cat:Base":"Основное","cat:Conversation":"Разговор","cat:Langue":"Язык","cat:Sentiments":"Чувства",
   numN:"Число",numCE:"Чеченский",numTL:"Транслит.",numST:"Структура",
+  install:"Установить",copy:"Копировать",copied:"Скопировано!",installHow:"Установка приложения:\niPhone/iPad: Safari \u2192 Поделиться \u2192 \u00abНа экран \u00abДомой\u00bb\u00bb.\nAndroid/ПК: меню браузера \u2192 \u00abУстановить приложение\u00bb.",
   aboutHtml:`<h2>Noxchiyn Mott — Нохчийн мотт</h2>
    <p>Словарь и переводчик чеченского языка, построенный на опубликованных и проверяемых источниках. Каждый результат показывает свой источник:</p>
    <p><span class="badge b-high">словарь</span> изданные словари (Wiktionary, Мациев…) · <span class="badge b-mid">Учебник</span> учебные пособия · <span class="badge b-low">онлайн-МП</span> машинный перевод, требует проверки.</p>
@@ -793,6 +815,7 @@ const I18N={
   impNone:"No text detected. If it is a scan, enable “force OCR”.",err:"Error: ",ocrModel:"Downloading OCR model…",
   "cat:Salutations":"Greetings","cat:Politesse":"Politeness","cat:Base":"Basics","cat:Conversation":"Conversation","cat:Langue":"Language","cat:Sentiments":"Feelings",
   numN:"Number",numCE:"Chechen",numTL:"Translit.",numST:"Structure",
+  install:"Install",copy:"Copy",copied:"Copied!",installHow:"To install the app:\niPhone/iPad: Safari \u2192 Share \u2192 \u201cAdd to Home Screen\u201d.\nAndroid/PC: browser menu \u2192 \u201cInstall app\u201d.",
   aboutHtml:`<h2>Noxchiyn Mott — Нохчийн мотт</h2>
    <p>A dictionary and translator for the Chechen language, built from published, verifiable sources. Every result shows its source:</p>
    <p><span class="badge b-high">dictionary</span> published dictionaries (Wiktionary, Matsiev…) · <span class="badge b-mid">Textbook</span> language courses · <span class="badge b-low">online MT</span> machine translation, to be verified.</p>
@@ -824,6 +847,7 @@ function applyLang(l){
   $("dico-q").placeholder=T("phDico");
   $("num-in").placeholder=T("phNum");
   const it=$("imp-trad"); if(it) it.textContent=T("impTrad");
+  const ins=$("lbl-install"); if(ins) ins.textContent=T("install");
   // noms des langues dans les sélecteurs
   const LN={fr:T("lnFr"),ce:T("lnCe"),ru:T("lnRu"),en:T("lnEn")};
   ["src-lang","dst-lang","imp-lang"].forEach(id=>{
@@ -872,6 +896,24 @@ function applyLang(l){
   }
   set(dark);
   b.addEventListener("click",()=>set(!dark));
+})();
+
+/* ---------- installation (bouton 📲) ---------- */
+(function(){
+  const b=$("btn-install"); if(!b) return;
+  const standalone=window.matchMedia&&window.matchMedia("(display-mode: standalone)").matches;
+  if(standalone) return; // déjà installée
+  let deferred=null;
+  window.addEventListener("beforeinstallprompt",e=>{
+    e.preventDefault(); deferred=e; b.style.display="";
+  });
+  const isIOS=/iphone|ipad|ipod/i.test(navigator.userAgent||"");
+  if(isIOS) b.style.display="";
+  b.addEventListener("click",async()=>{
+    if(deferred){ deferred.prompt(); try{await deferred.userChoice;}catch(e){} deferred=null; b.style.display="none"; }
+    else alert(T("installHow"));
+  });
+  window.addEventListener("appinstalled",()=>{b.style.display="none";});
 })();
 
 /* ---------- PWA ---------- */
