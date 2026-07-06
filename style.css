@@ -15,6 +15,8 @@ body.dark .b-high{color:#fff}
 body.dark nav#tabs button{color:#b9cdc0}
 body.dark ::placeholder{color:#7d9186}
 *{box-sizing:border-box}
+button{color:inherit}
+input[type=file]{color:var(--mut)}
 body{margin:0;font-family:"Segoe UI",system-ui,-apple-system,Roboto,sans-serif;background:var(--bg);color:var(--ink);line-height:1.5}
 
 /* bande d'ornement nakh (motif géométrique) */
