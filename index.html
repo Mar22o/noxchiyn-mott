@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Marck+Script&family=Bad+Script&display=swap">
-<link rel="stylesheet" href="style.css?v=4">
+<link rel="stylesheet" href="style.css?v=7">
 </head>
 <body>
 <div class="ornament-band" aria-hidden="true"></div>
@@ -20,8 +20,15 @@
     <svg class="logo" viewBox="0 0 48 48" aria-hidden="true"><path d="M18 44 L20 14 L16 10 L24 3 L32 10 L28 14 L30 44 Z" fill="currentColor"/><rect x="21.5" y="20" width="5" height="7" rx="1" fill="#f7f6f2"/></svg>
     <div>
       <h1>Нохчийн мотт</h1>
-      <p class="sub">Noxchiyn Mott · traducteur tchétchène</p>
+      <p class="sub" id="sub-title">Noxchiyn Mott · traducteur tchétchène</p>
     </div>
+    <select id="ui-lang" class="ui-lang" title="Langue de l'interface">
+      <option value="fr">🌐 FR</option>
+      <option value="ru">🌐 RU</option>
+      <option value="en">🌐 EN</option>
+      <option value="ce">🌐 CE</option>
+    </select>
+    <button id="btn-theme" class="ui-lang" title="Thème clair / sombre" style="margin-left:8px;cursor:pointer">🌙</button>
   </div>
   <nav id="tabs">
     <button data-tab="trad" class="active">Traducteur</button>
@@ -56,7 +63,7 @@
   <div id="kbd" class="kbd"></div>
   <div class="actions">
     <button id="btn-trad" class="primary">Traduire</button>
-    <label class="mt-toggle"><input type="checkbox" id="use-mt" checked> Traduction en ligne (Google) pour les phrases</label>
+    <label class="mt-toggle"><input type="checkbox" id="use-mt" checked> <span id="lbl-mt">Traduction en ligne (Google) pour les phrases</span></label>
     <button id="btn-cursive" class="cursive-btn" title="Afficher le tchétchène en écriture manuscrite attachée">✍ manuscrit</button>
   </div>
   <div id="trad-out"></div>
@@ -109,6 +116,7 @@
   </div>
   <p id="imp-status" class="hint"></p>
   <textarea id="imp-text" rows="9" placeholder="Le texte extrait apparaîtra ici (modifiable avant traduction)…" spellcheck="false"></textarea>
+  <div id="kbd3" class="kbd"></div>
   <div class="actions">
     <button id="imp-trad" class="primary">Traduire ce texte →</button>
     <span class="hint">Les .doc anciens ne sont pas pris en charge : enregistrez-les en .docx.</span>
@@ -125,8 +133,10 @@
     <span class="badge b-low">MT en ligne</span> traduction automatique — qualité limitée pour le tchétchène, à vérifier.</p>
     <h3>Sources des données</h3>
     <ul>
-      <li><b>Wiktionary anglais</b> (via kaikki.org, licence CC BY-SA) — 1 177 entrées tchétchènes avec traduction française.</li>
-      <li><b>Dictionnaire tchétchène-russe de A. G. Matsiev</b> et vocabulaire BaltoSlav, via le corpus ouvert <i>NM-development/nmd-ce-ru-171k-v0</i> (arXiv:2507.12672) — 13 704 paires CE↔RU. Ce dictionnaire sert aussi à corriger les mots russes laissés par la traduction automatique.</li>
+      <li><b>Wiktionary anglais complet</b> (via kaikki.org, licence CC BY-SA) — 1 249 entrées tchétchènes avec traduction française.</li>
+      <li><b>Wiktionary russe complet</b> (via kaikki.org, CC BY-SA) — 3 828 entrées tchétchènes avec définitions russes.</li>
+      <li><b>Diaspora turque</b> (dillerdagi, samilkorkmaz) — 67 paires tchétchène (latin phonétique) ↔ turc.</li>
+      <li><b>Dictionnaire tchétchène-russe de A. G. Matsiev (intégral)</b>, dictionnaire d'anatomie Bersanov et vocabulaire BaltoSlav, via le corpus ouvert <i>NM-development/nmd-ce-ru-171k-v0</i> (arXiv:2507.12672) — 94 342 paires CE↔RU. Ce dictionnaire sert aussi à corriger les mots russes laissés par la traduction automatique.</li>
       <li><b>Sources web secondaires</b> — chechen.tchetchene.free.fr (vocabulaire FR-CE thématique), Waynakh Online, wiki LING073 : 1 156 paires supplémentaires, marquées de leur source.</li>
       <li><b>Méthodes de langue</b> (LIMBA, Waynakh Online) pour les expressions courantes.</li>
       <li>Grammaire : J. Nichols, fiche CNRS-LGIDF « Le tchétchène ».</li>
@@ -140,8 +150,8 @@
 
 <footer>Noxchiyn Mott <span class="dot">·</span> v1.0 <span class="dot">·</span> sources ouvertes, traductions vérifiables</footer>
 
-<script src="data/dict.js?v=4"></script>
-<script src="data/phrases.js?v=4"></script>
-<script src="app.js?v=4"></script>
+<script src="data/dict.js?v=7"></script>
+<script src="data/phrases.js?v=7"></script>
+<script src="app.js?v=7"></script>
 </body>
 </html>

@@ -45,6 +45,7 @@ W.forEach((e,i)=>{ const ref={t:"w",i};
   addIdx(idxCe,norm(e.c),ref);
   tokens(e.f).forEach(t=>addIdx(idxFr,normFr(t),ref));
   tokens(e.e).forEach(t=>addIdx(idxEn,normFr(t),ref));
+  if(e.r) tokens(e.r).forEach(t=>addIdx(idxRu,normFr(t),ref)); // gloses du Wiktionary russe
 });
 R.forEach((e,i)=>{ const ref={t:"r",i};
   addIdx(idxCe,norm(e.c),ref);
@@ -75,13 +76,15 @@ const STOP_RU=new Set("и в на не с к у о а же бы ли что ка
 function isStop(w,lang){const x=normFr(w);
   return lang==="fr"?STOP_FR.has(x):lang==="en"?STOP_EN.has(x):lang==="ru"?STOP_RU.has(x):false;}
 
-const SRC_LBL={"tchetchene.free.fr":"tchetchene.free.fr","waynakh":"Waynakh","ling073":"LING073"};
+const SRC_LBL={"tchetchene.free.fr":"tchetchene.free.fr","waynakh":"Waynakh","ling073":"LING073",
+  "ruwikt":"Wiktionary (ru)","diasporaTR":"diaspora TR"};
 function refData(ref){
   if(ref.t==="w"){ const e=W[ref.i];
-    return {ce:e.c,fr:e.f||"",en:e.e||"",ru:"",pos:POS_FR[e.p]||e.p,
-      src:e.s?(SRC_LBL[e.s]||e.s):"Wiktionary",cls:e.s?"b-mid":"b-high",v:e.v}; }
+    return {ce:e.c,fr:e.f||"",en:e.e||"",ru:e.r||"",tr:e.t||"",pos:POS_FR[e.p]||e.p,
+      src:e.s?(SRC_LBL[e.s]||e.s):"Wiktionary",
+      cls:(!e.s||e.s==="ruwikt")?"b-high":"b-mid",v:e.v}; }
   const e=R[ref.i];
-  return {ce:e.c,fr:"",en:"",ru:e.r,pos:"",src:e.s||"Matsiev",cls:"b-high"};
+  return {ce:e.c,fr:"",en:"",ru:e.r,tr:"",pos:"",src:e.s||"Matsiev",cls:"b-high"};
 }
 function entryHtml(d,dst){
   let tr=[];
@@ -120,6 +123,7 @@ function renderGrouped(refs,dst){
       if(d.ru&&(dst==="ru"||!d.fr)) tr.push("ru : "+esc(d.ru));
       else if(d.ru) tr.push(`<span class="lat">ru : ${esc(d.ru)}</span>`);
       if(d.en&&(dst==="en"||!d.fr)) tr.push(esc(d.en));
+      if(d.tr) tr.push("tr : "+esc(d.tr));
       if(d.v) tr.push(`<span class="lat">variante de ${esc(d.v)}</span>`);
       html+=`<div class="sense">${d.pos?`<span class="pos">${d.pos}</span> `:""}${tr.join(" · ")} <span class="badge ${d.cls}" title="Source">${esc(d.src)}</span></div>`;
     }
@@ -173,16 +177,18 @@ function ruLookup(w){
 // sinon, s'il est identifié comme russe, on lui substitue l'équivalent du dictionnaire.
 function analyzeCe(text){
   const parts=text.split(/([^а-яёА-ЯЁӏӀ-]+)/);
-  let leaks=0; const subs=[]; const out=[];
+  let leaks=0, unknown=0; const subs=[]; const out=[];
   for(const w of parts){
     if(!/[а-яё]/i.test(w)){out.push(w);continue;}
     if(idxCe.has(norm(w))){out.push(w);continue;}
     const hit=ruLookup(w.toLowerCase());
     if(hit){leaks++;subs.push({ru:w,ce:hit.c,src:hit.s==="dico"?"dictionnaire":hit.s});out.push(hit.c);}
-    else out.push(w);
+    else {unknown++;out.push(w);}
   }
-  return {leaks,subs,text:out.join("")};
+  return {leaks,unknown,subs,text:out.join("")};
 }
+// lettres/digraphes propres au tchétchène : si un mot en contient, il n'est PAS russe
+const CE_MARKS=/[ӏӀ]|аь|оь|уь|хь|хӏ|гӏ|къ|кх|цӏ|чӏ|кӏ|пӏ|тӏ/i;
 // filet en ligne : les mots russes restants sont retraduits UN PAR UN (ru->ce mot isolé,
 // bien plus fiable que la phrase entière), max 6 mots
 async function fixLeaksOnline(ana){
@@ -190,12 +196,18 @@ async function fixLeaksOnline(ana){
   let n=0;
   for(let i=0;i<parts.length&&n<6;i++){
     const w=parts[i];
-    if(!/[а-яё]/i.test(w)||w.length<3) continue;
+    if(!/[а-яё]/i.test(w)||w.length<4) continue;   // trop court = trop risqué
+    if(CE_MARKS.test(w)) continue;                  // contient une lettre tchétchène : pas du russe
     if(idxCe.has(norm(w))) continue;
     if(ruLookup(w.toLowerCase())) continue; // déjà substitué par le dictionnaire
+    // ne retraduire que les mots CONFIRMÉS russes par notre corpus (sinon on risque
+    // de « traduire » un mot tchétchène rare, cf. вац -> ват)
+    const lw=w.toLowerCase(), M=ruTokenMap();
+    if(!M.has(lw)&&!M.has(lw.slice(0,-1))&&!M.has(lw.slice(0,-2))) continue;
     try{
       const t=await gtx("ru","ce",w.toLowerCase());
-      if(t&&norm(t)!==norm(w.toLowerCase())&&/[а-яёӏ]/i.test(t)&&t.split(/\s+/).length<=2){
+      // n'accepter la substitution QUE si le résultat est un mot vérifié de notre dictionnaire
+      if(t&&norm(t)!==norm(w.toLowerCase())&&idxCe.has(norm(t))){
         ana.subs.push({ru:w,ce:t,src:"MT mot"});
         parts[i]=t; n++;
       }
@@ -269,6 +281,7 @@ function buildKbd(el,target){
 }
 buildKbd(document.getElementById("kbd"),"trad-in");
 buildKbd(document.getElementById("kbd2"),"dico-q");
+if(document.getElementById("kbd3")) buildKbd(document.getElementById("kbd3"),"imp-text");
 
 /* ---------- traducteur ---------- */
 const $=id=>document.getElementById(id);
@@ -380,7 +393,8 @@ async function doTranslate(){
       if(dst==="ce"){
         const cands=[["directe",direct],["pivot russe",pivot]].filter(c=>c[1])
           .map(([n,t])=>[n,t,analyzeCe(t)]);
-        cands.sort((a,b)=>a[2].leaks-b[2].leaks);
+        // choisir la version qui contient le MOINS de mots étrangers au dictionnaire tchétchène
+        cands.sort((a,b)=>(a[2].leaks+a[2].unknown)-(b[2].leaks+b[2].unknown));
         const [name,raw,anaRaw]=cands[0];
         const ana=await fixLeaksOnline(anaRaw);
         html+=`<p class="ce" style="font-size:1.15rem;font-weight:600">${esc(ana.text)}</p>
@@ -412,7 +426,7 @@ async function doTranslate(){
 }
 
 /* ---------- dictionnaire ---------- */
-$("dico-stats").textContent=`${W.length} entrées fr/en (Wiktionary, tchetchene.free.fr, Waynakh, LING073) + ${R.length} paires tchétchène-russe (Matsiev, BaltoSlav).`;
+$("dico-stats").textContent=`${W.length} entrées (Wiktionary en/ru, tchetchene.free.fr, Waynakh, LING073, diaspora TR) + ${R.length} paires tchétchène-russe (Matsiev intégral, Bersanov, BaltoSlav).`;
 let dicoTimer=null;
 $("dico-q").addEventListener("input",()=>{
   clearTimeout(dicoTimer);
@@ -648,6 +662,45 @@ async function handleFile(file){
   });
 })();
 
+/* ---------- langue de l'interface ---------- */
+const I18N={
+ fr:{trad:"Traducteur",dico:"Dictionnaire",phrases:"Expressions",nombres:"Nombres",gram:"Grammaire","import":"Importer",apropos:"À propos",
+  btnTrad:"Traduire",mt:"Traduction en ligne (Google) pour les phrases",manu:"✍ manuscrit",
+  phTrad:"Mot ou phrase… (клавиатура нохчийн ↓)",phDico:"Chercher un mot (fr, ce, ru, en)… ex : loup, борз",
+  phNum:"Entrez un nombre (0–999 999)",impTrad:"Traduire ce texte →",sub:"Noxchiyn Mott · traducteur tchétchène"},
+ ru:{trad:"Переводчик",dico:"Словарь",phrases:"Выражения",nombres:"Числа",gram:"Грамматика","import":"Импорт",apropos:"О программе",
+  btnTrad:"Перевести",mt:"Онлайн-перевод (Google) для фраз",manu:"✍ рукописный",
+  phTrad:"Слово или фраза…",phDico:"Поиск слова (fr, ce, ru, en)… напр. волк, борз",
+  phNum:"Введите число (0–999 999)",impTrad:"Перевести этот текст →",sub:"Noxchiyn Mott · чеченский переводчик"},
+ en:{trad:"Translator",dico:"Dictionary",phrases:"Phrases",nombres:"Numbers",gram:"Grammar","import":"Import",apropos:"About",
+  btnTrad:"Translate",mt:"Online translation (Google) for sentences",manu:"✍ cursive",
+  phTrad:"Word or sentence…",phDico:"Search a word (fr, ce, ru, en)… e.g. wolf, борз",
+  phNum:"Enter a number (0–999,999)",impTrad:"Translate this text →",sub:"Noxchiyn Mott · Chechen translator"},
+ ce:{trad:"Гочдар",dico:"Дошам",phrases:"Аларш",nombres:"Терахьдешнаш",gram:"Грамматика","import":"Импорт",apropos:"Лаьцна",
+  btnTrad:"Гочде",mt:"Онлайн-гочдар (Google)",manu:"✍ куьйган йоза",
+  phTrad:"Дош я предложени…",phDico:"Дош лаха… (масала : борз)",
+  phNum:"Терахь язде (0–999 999)",impTrad:"ХӀара йоза гочде →",sub:"Нохчийн мотт · нохчийн гочдархо"}
+};
+function applyLang(l){
+  const t=k=>(I18N[l]&&I18N[l][k])||I18N.fr[k];
+  document.querySelectorAll("#tabs button[data-tab]").forEach(b=>{b.textContent=t(b.dataset.tab);});
+  $("btn-trad").textContent=t("btnTrad");
+  const m=$("lbl-mt"); if(m) m.textContent=t("mt");
+  const c=$("btn-cursive"); if(c) c.textContent=t("manu");
+  $("trad-in").placeholder=t("phTrad");
+  $("dico-q").placeholder=t("phDico");
+  $("num-in").placeholder=t("phNum");
+  const it=$("imp-trad"); if(it) it.textContent=t("impTrad");
+  const st=$("sub-title"); if(st) st.textContent=t("sub");
+}
+(function(){
+  const sel=$("ui-lang"); if(!sel) return;
+  let l="fr"; try{l=localStorage.getItem("nm_uilang")||"fr";}catch(e){}
+  sel.value=l; applyLang(l);
+  sel.addEventListener("change",()=>{ applyLang(sel.value);
+    try{localStorage.setItem("nm_uilang",sel.value);}catch(e){} });
+})();
+
 /* ---------- affichage manuscrit (cursive attachée) ---------- */
 (function(){
   const b=$("btn-cursive"); if(!b)return;
@@ -656,6 +709,23 @@ async function handleFile(file){
     try{localStorage.setItem("nm_cursive",v?"1":"0");}catch(e){}}
   set(on);
   b.addEventListener("click",()=>set(!on));
+})();
+
+/* ---------- thème sombre ---------- */
+(function(){
+  const b=$("btn-theme"); if(!b) return;
+  let dark=false;
+  try{
+    const s=localStorage.getItem("nm_theme");
+    dark = s ? s==="dark" : (window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches);
+  }catch(e){}
+  function set(v){ dark=v;
+    document.body.classList.toggle("dark",v);
+    b.textContent=v?"☀️":"🌙";
+    try{localStorage.setItem("nm_theme",v?"dark":"light");}catch(e){}
+  }
+  set(dark);
+  b.addEventListener("click",()=>set(!dark));
 })();
 
 /* ---------- PWA ---------- */
