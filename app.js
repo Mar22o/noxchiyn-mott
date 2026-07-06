@@ -124,7 +124,7 @@ function renderGrouped(refs,dst){
       else if(d.ru) tr.push(`<span class="lat">ru : ${esc(d.ru)}</span>`);
       if(d.en&&(dst==="en"||!d.fr)) tr.push(esc(d.en));
       if(d.tr) tr.push("tr : "+esc(d.tr));
-      if(d.v) tr.push(`<span class="lat">variante de ${esc(d.v)}</span>`);
+      if(d.v) tr.push(`<span class="lat">${T("variantOf")} ${esc(d.v)}</span>`);
       html+=`<div class="sense">${d.pos?`<span class="pos">${d.pos}</span> `:""}${tr.join(" · ")} <span class="badge ${d.cls}" title="Source">${esc(d.src)}</span></div>`;
     }
     html+=`</div></div>`;
@@ -324,13 +324,13 @@ async function doTranslate(){
   // 1. expressions du guide de conversation
   const ph=phraseMatches(q,src==="ce"?"ce":"fr");
   if(ph.length){
-    html+=`<div class="card"><h2>Expressions</h2>`+
-      ph.map(p=>`<div class="entry"><span class="ce">${esc(p.ce)}</span><span class="lat">${esc(translit(p.ce))}</span><span class="tr">${esc(p.fr)}</span><span class="badge b-mid">Manuel</span></div>`).join("")+`</div>`;
+    html+=`<div class="card"><h2>${T("cardExpr")}</h2>`+
+      ph.map(p=>`<div class="entry"><span class="ce">${esc(p.ce)}</span><span class="lat">${esc(translit(p.ce))}</span><span class="tr">${esc(p.fr)}</span><span class="badge b-mid">${T("badgeManual")}</span></div>`).join("")+`</div>`;
   }
   // 2. dictionnaire (requête entière) — sens multiples groupés par mot tchétchène
   const refs=dictSection(q,src,dst);
   if(refs.length){
-    html+=`<div class="card"><h2>Dictionnaire</h2>`+renderGrouped(refs,dst)+`</div>`;
+    html+=`<div class="card"><h2>${T("cardDict")}</h2>`+renderGrouped(refs,dst)+`</div>`;
   }
   // 3. mot à mot : uniquement les mots porteurs de sens, correspondances exactes
   if(words.length>1&&words.length<=12){
@@ -342,10 +342,10 @@ async function doTranslate(){
       rs=rs.slice(0,4);
       if(rs.length) rows+=`<p class="hint" style="margin:8px 0 0"><b>${esc(w)}</b></p>`+renderGrouped(rs,dst);
     }
-    if(rows) html+=`<div class="card"><h2>Mot à mot (mots porteurs de sens)</h2>${rows}</div>`;
+    if(rows) html+=`<div class="card"><h2>${T("cardWbw")}</h2>${rows}</div>`;
   }
   if(!html&&!$("use-mt").checked){
-    html=`<div class="empty">Aucun résultat dans le dictionnaire. Essayez la traduction en ligne ou une autre orthographe (ӏ / 1, аь…).</div>`;
+    html=`<div class="empty">${T("noRes")}</div>`;
   }
   out.innerHTML=html;
   // 3bis. expressions idiomatiques du dictionnaire Matsiev, trouvées en déduisant le sens
@@ -369,7 +369,7 @@ async function doTranslate(){
       rf=rf.slice(0,8);
       if(rf.length){
         const div=document.createElement("div"); div.className="card";
-        div.innerHTML=`<h2>Expressions proches du sens <span class="hint" style="font-weight:400">(via le russe « ${esc(ruQ)} », dict. Matsiev)</span></h2>`
+        div.innerHTML=`<h2>${T("cardNear")} <span class="hint" style="font-weight:400">(${T("viaRu")} « ${esc(ruQ)} »)</span></h2>`
           +renderGrouped(rf,dst);
         out.appendChild(div);
       }
@@ -379,7 +379,7 @@ async function doTranslate(){
   if($("use-mt").checked&&(words.length>1||!refs.length)){
     const box=document.createElement("div");
     box.className="card mt-box";
-    box.innerHTML=`<h2>Traduction automatique</h2><p class="hint">Interrogation de Google Translate (directe + pivot russe)…</p>`;
+    box.innerHTML=`<h2>${T("cardMT")}</h2><p class="hint">${T("mtQuery")}</p>`;
     out.appendChild(box);
     const qmt=q.length>1800?q.slice(0,1800):q; // limite de l'API
     try{
@@ -389,9 +389,9 @@ async function doTranslate(){
         try{ pivot=await gtx("ru",dst,await gtx(src,"ru",qmt)); }catch(e){}
       }
       if(!direct&&!pivot) throw new Error("aucune réponse");
-      let html=`<h2>Traduction automatique <span class="badge b-low">MT en ligne</span></h2>`;
+      let html=`<h2>${T("cardMT")} <span class="badge b-low">${T("badgeMT")}</span></h2>`;
       if(dst==="ce"){
-        const cands=[["directe",direct],["pivot russe",pivot]].filter(c=>c[1])
+        const cands=[[T("mtDirect"),direct],[T("mtPivot"),pivot]].filter(c=>c[1])
           .map(([n,t])=>[n,t,analyzeCe(t)]);
         // choisir la version qui contient le MOINS de mots étrangers au dictionnaire tchétchène
         cands.sort((a,b)=>(a[2].leaks+a[2].unknown)-(b[2].leaks+b[2].unknown));
@@ -400,33 +400,33 @@ async function doTranslate(){
         html+=`<p class="ce" style="font-size:1.15rem;font-weight:600">${esc(ana.text)}</p>
           <p class="lat">${esc(translit(ana.text))}</p>`;
         if(ana.subs.length){
-          html+=`<p class="hint">✔ Mots russes laissés par Google, remplacés : `
-            +ana.subs.map(s=>`<b>${esc(s.ru)}</b> → <span class="ce">${esc(s.ce)}</span> <span class="badge ${s.src==="MT mot"?"b-low":"b-high"}">${s.src==="MT mot"?"MT mot isolé":"dictionnaire"}</span>`).join(" · ")
-            +`</p><p class="hint">Version brute de Google (${name}) : ${esc(raw)}</p>`;
+          html+=`<p class="hint">${T("mtSubs")}`
+            +ana.subs.map(s=>`<b>${esc(s.ru)}</b> → <span class="ce">${esc(s.ce)}</span> <span class="badge ${s.src==="MT mot"?"b-low":"b-high"}">${s.src==="MT mot"?T("badgeWord"):T("badgeDict")}</span>`).join(" · ")
+            +`</p><p class="hint">${T("mtRaw")} (${name}) : ${esc(raw)}</p>`;
         }
         if(cands.length>1&&cands[1][2].text!==ana.text){
-          html+=`<p class="hint">Autre version (${cands[1][0]}) : <span class="ce">${esc(cands[1][2].text)}</span></p>`;
+          html+=`<p class="hint">${T("mtOther")} (${cands[1][0]}) : <span class="ce">${esc(cands[1][2].text)}</span></p>`;
         }
       }else{
         const main=direct||pivot;
         html+=`<p style="font-size:1.1rem;font-weight:600">${esc(main)}</p>
           ${isCyr(main)?`<p class="lat">${esc(translit(main))}</p>`:""}`;
-        if(pivot&&direct&&pivot!==direct) html+=`<p class="hint">Via le russe : ${esc(pivot)}</p>`;
+        if(pivot&&direct&&pivot!==direct) html+=`<p class="hint">${T("viaRu")} : ${esc(pivot)}</p>`;
       }
-      if(q.length>1800) html+=`<p class="hint">Texte long : seuls les 1 800 premiers caractères ont été traduits.</p>`;
-      html+=`<p class="warn">⚠ Qualité limitée pour le tchétchène — vérifiez les mots importants avec le dictionnaire ci-dessus.</p>`;
+      if(q.length>1800) html+=`<p class="hint">${T("mtLong")}</p>`;
+      html+=`<p class="warn">${T("mtWarn")}</p>`;
       box.innerHTML=html;
     }catch(e){
       const gl=`https://translate.google.com/?sl=${src}&tl=${dst}&text=${encodeURIComponent(q)}`;
-      box.innerHTML=`<h2>Traduction automatique</h2>
-        <p class="hint">Service en ligne inaccessible depuis l'application (hors ligne ou accès bloqué).
-        <a href="${gl}" target="_blank" rel="noopener">Ouvrir dans Google Translate ↗</a></p>`;
+      box.innerHTML=`<h2>${T("cardMT")}</h2>
+        <p class="hint">${T("mtOffline")}
+        <a href="${gl}" target="_blank" rel="noopener">${T("mtOpen")}</a></p>`;
     }
   }
 }
 
 /* ---------- dictionnaire ---------- */
-$("dico-stats").textContent=`${W.length} entrées (Wiktionary en/ru, tchetchene.free.fr, Waynakh, LING073, diaspora TR) + ${R.length} paires tchétchène-russe (Matsiev intégral, Bersanov, BaltoSlav).`;
+/* stats retirées */
 let dicoTimer=null;
 $("dico-q").addEventListener("input",()=>{
   clearTimeout(dicoTimer);
@@ -441,18 +441,18 @@ $("dico-q").addEventListener("input",()=>{
     }
     out.innerHTML=refs.length
       ? `<div class="card">`+renderGrouped(refs.slice(0,80),"fr")+`</div>`
-      : `<div class="empty">Aucun résultat.</div>`;
+      : `<div class="empty">${T("noRes2")}</div>`;
   },200);
 });
 
 /* ---------- expressions ---------- */
-(function(){
+function renderPhrases(){
   const cats=[...new Set(NM_PHRASES.map(p=>p.cat))];
   $("phrases-out").innerHTML=cats.map(c=>
-    `<div class="card"><h2>${esc(c)}</h2>`+
+    `<div class="card"><h2>${esc(T("cat:"+c))}</h2>`+
     NM_PHRASES.filter(p=>p.cat===c).map(p=>
-      `<div class="entry"><span class="ce">${esc(p.ce)}</span><span class="lat">${esc(translit(p.ce))}</span><span class="tr">${esc(p.fr)}</span><span class="badge b-mid">Manuel</span></div>`).join("")+`</div>`).join("");
-})();
+      `<div class="entry"><span class="ce">${esc(p.ce)}</span><span class="lat">${esc(translit(p.ce))}</span><span class="tr">${esc(p.fr)}</span><span class="badge b-mid">${T("badgeManual")}</span></div>`).join("")+`</div>`).join("");
+}
 
 /* ---------- nombres (système vigésimal) ---------- */
 const NUM={0:"ноль",1:"цхьаъ",2:"шиъ",3:"кхоъ",4:"диъ",5:"пхиъ",6:"ялх",7:"ворхӏ",8:"бархӏ",9:"исс",10:"итт",
@@ -485,62 +485,106 @@ $("num-in").addEventListener("input",()=>{
                  +(n>20&&!(n in NUM)?` <span class="hint">(forme composée générée par règle vigésimale)</span>`:"")
                :"Nombre hors limites (0–999 999).";
 });
-(function(){
-  const rows=[[1,"—"],[2,"—"],[3,"—"],[4,"—"],[5,"—"],[6,"—"],[7,"—"],[8,"—"],[9,"—"],[10,"—"],
-   [11,"10+1"],[15,"10+5"],[19,"« vingt moins un »"],[20,"base"],[30,"20+10"],[40,"2×20"],[50,"2×20+10"],
-   [60,"3×20"],[70,"3×20+10"],[80,"4×20"],[90,"4×20+10"],[100,"—"],[200,"2×100"],[1000,"—"]];
-  $("num-table").innerHTML=`<table><tr><th>Nombre</th><th>Tchétchène</th><th>Translit.</th><th>Structure</th></tr>`+
-    rows.map(([n,s])=>{const w=num2ce(n);return `<tr><td>${n}</td><td><b>${esc(w)}</b></td><td>${esc(translit(w))}</td><td>${s}</td></tr>`;}).join("")+`</table>`;
-})();
+function renderNumTable(){
+  const rows=[[1,"\u2014"],[2,"\u2014"],[3,"\u2014"],[4,"\u2014"],[5,"\u2014"],[6,"\u2014"],[7,"\u2014"],[8,"\u2014"],[9,"\u2014"],[10,"\u2014"],
+   [11,"10+1"],[15,"10+5"],[19,"20\u22121"],[20,"\u2014"],[30,"20+10"],[40,"2\u00d720"],[50,"2\u00d720+10"],
+   [60,"3\u00d720"],[70,"3\u00d720+10"],[80,"4\u00d720"],[90,"4\u00d720+10"],[100,"\u2014"],[200,"2\u00d7100"],[1000,"\u2014"]];
+  $("num-table").innerHTML=`<table><tr><th>${T("numN")}</th><th>${T("numCE")}</th><th>${T("numTL")}</th><th>${T("numST")}</th></tr>`+
+    rows.map(([n,st])=>{const w=num2ce(n);return `<tr><td>${n}</td><td><b>${esc(w)}</b></td><td>${esc(translit(w))}</td><td>${st}</td></tr>`;}).join("")+`</table>`;
+}
 
-/* ---------- grammaire ---------- */
-(function(){
-  // Déclinaison réelle de москал (dinde) reconstituée depuis les données Wiktionary
-  const cases=[["nominatif","nominative"],["génitif","genitive"],["datif","dative"],["ergatif","ergative"],
-    ["instrumental","instrumental"],["matériel (substantif)","substantive"],["comparatif","comparative degree"],["locatif","locative"]];
+/* ---------- grammaire (multilingue) ---------- */
+const GRAM={
+fr:{alpha:"Alphabet et sons particuliers",
+ alphaP:"Le tchétchène s'écrit en cyrillique, avec des lettres propres. La <b>palotchka Ӏ</b> marque des consonnes éjectives ou pharyngales.",
+ letter:"Lettre",pron:"Prononciation approchée",
+ rows:[["аь / оь / уь","voyelles antérieures : « è », « eu » (fr. p<b>eu</b>r), « u » (fr. t<b>u</b>)"],
+  ["Ӏ","consonne pharyngale sonore (comme l'arabe ʿayn ع)"],["хӀ","« h » aspiré (angl. <i>h</i>ello)"],
+  ["хь","« h » pharyngal fort (arabe ح)"],["х","« kh » guttural (esp. <i>j</i>ota, all. Ba<i>ch</i>)"],
+  ["гӀ","« gh », r grasseyé (arabe غ)"],["кх","« q » uvulaire (arabe ق)"],
+  ["къ, кӀ, пӀ, тӀ, цӀ, чӀ","consonnes éjectives (k', p', t', ts', tch' « claquées »)"]],
+ cls:"Classes nominales (accord)",
+ clsP:"Chaque nom appartient à l'une de <b>6 classes</b>. Verbes et adjectifs qui s'accordent portent un préfixe de classe : <b>в-</b> (homme), <b>й-</b> (femme), <b>б-</b>, <b>д-</b>… Le verbe « être » : <span class=\"ce\">ву / ю / бу / ду</span>.",
+ ex:"Exemple",sens:"Sens",
+ clsRows:[["стаг ву","l'homme est (classe 1, в-)"],["зуда ю","la femme est (classe 2, й-)"],["мотт бу","la langue est (classe б-)"],["хи ду","l'eau est (classe д-)"]],
+ clsN:"C'est pour cela que plusieurs expressions changent selon qu'on parle à un homme ou à une femme (ву/ю).",
+ cas:"Déclinaison : 8 cas",
+ casP:"Le nom se décline. Suffixes de base : génitif <span class=\"ce\">-н</span>, datif <span class=\"ce\">-на</span>, ergatif <span class=\"ce\">-о/-с</span>, instrumental <span class=\"ce\">-ца</span>, matériel <span class=\"ce\">-х</span>, comparatif <span class=\"ce\">-л</span>, locatif <span class=\"ce\">-хь/-га/-ра</span>. Exemple réel — <span class=\"ce\">москал</span> (dinde) :",
+ cCase:"Cas",cSg:"Singulier",cPl:"Pluriel",
+ casN:"La voyelle du radical change souvent (ex. : мотт → меттан « de la langue »). Les formes fléchies connues sont dans le dictionnaire.",
+ vb:"Phrase et verbe",
+ vbP:"Ordre habituel : <b>Sujet – Objet – Verbe</b> (SOV). Langue <b>ergative</b> : le sujet d'un verbe transitif prend l'ergatif (<span class=\"ce\">со</span> « je » → <span class=\"ce\">ас</span>). Ex. : <span class=\"ce\">Ас нохчийн мотт ӏамабо</span> — « J'apprends la langue tchétchène ».",
+ vbP2:"Le verbe ne s'accorde pas en personne, mais en <b>classe</b> (в/й/б/д) : <span class=\"ce\">ван / ян / бан / дан</span> « faire ».",
+ refs:"Références : J. Nichols (Berkeley), fiche « Le tchétchène » du CNRS-LGIDF.",
+ cases:[["nominatif","nominative"],["génitif","genitive"],["datif","dative"],["ergatif","ergative"],["instrumental","instrumental"],["matériel","substantive"],["comparatif","comparative degree"],["locatif","locative"]]},
+ru:{alpha:"Алфавит и особые звуки",
+ alphaP:"Чеченский пишется кириллицей с особыми буквами. <b>Палочка Ӏ</b> обозначает абруптивные и фарингальные согласные.",
+ letter:"Буква",pron:"Примерное произношение",
+ rows:[["аь / оь / уь","гласные переднего ряда: «э», «ö» (нем. sch<b>ö</b>n), «ü» (нем. f<b>ü</b>r)"],
+  ["Ӏ","звонкий фарингальный согласный (как арабский ʿайн ع)"],["хӀ","придыхательное «h» (англ. <i>h</i>ello)"],
+  ["хь","сильное фарингальное «х» (араб. ح)"],["х","глубокое «х» (нем. Ba<i>ch</i>)"],
+  ["гӀ","«гх», картавое «р» (араб. غ)"],["кх","увулярное «къ» (араб. ق)"],
+  ["къ, кӀ, пӀ, тӀ, цӀ, чӀ","абруптивные согласные (к', п', т', ц', ч')"]],
+ cls:"Именные классы (согласование)",
+ clsP:"Каждое имя относится к одному из <b>6 классов</b>. Согласуемые глаголы и прилагательные получают классный префикс: <b>в-</b> (мужчина), <b>й-</b> (женщина), <b>б-</b>, <b>д-</b>… Глагол «быть»: <span class=\"ce\">ву / ю / бу / ду</span>.",
+ ex:"Пример",sens:"Значение",
+ clsRows:[["стаг ву","мужчина есть (класс 1, в-)"],["зуда ю","женщина есть (класс 2, й-)"],["мотт бу","язык есть (класс б-)"],["хи ду","вода есть (класс д-)"]],
+ clsN:"Поэтому многие выражения меняются в зависимости от пола собеседника (ву/ю).",
+ cas:"Склонение: 8 падежей",
+ casP:"Имя склоняется. Базовые суффиксы: родительный <span class=\"ce\">-н</span>, дательный <span class=\"ce\">-на</span>, эргативный <span class=\"ce\">-о/-с</span>, творительный <span class=\"ce\">-ца</span>, вещественный <span class=\"ce\">-х</span>, сравнительный <span class=\"ce\">-л</span>, местный <span class=\"ce\">-хь/-га/-ра</span>. Реальный пример — <span class=\"ce\">москал</span> (индюк):",
+ cCase:"Падеж",cSg:"Ед. число",cPl:"Мн. число",
+ casN:"Гласная основы часто меняется (мотт → меттан «языка»). Известные словоформы есть в словаре.",
+ vb:"Предложение и глагол",
+ vbP:"Обычный порядок: <b>Подлежащее – Дополнение – Глагол</b> (SOV). Язык <b>эргативный</b>: субъект переходного глагола в эргативе (<span class=\"ce\">со</span> «я» → <span class=\"ce\">ас</span>). Пример: <span class=\"ce\">Ас нохчийн мотт ӏамабо</span> — «Я учу чеченский язык».",
+ vbP2:"Глагол согласуется не по лицу, а по <b>классу</b> (в/й/б/д): <span class=\"ce\">ван / ян / бан / дан</span> «делать».",
+ refs:"Источники: Дж. Николс (Беркли), CNRS-LGIDF «Le tchétchène».",
+ cases:[["именительный","nominative"],["родительный","genitive"],["дательный","dative"],["эргативный","ergative"],["творительный","instrumental"],["вещественный","substantive"],["сравнительный","comparative degree"],["местный","locative"]]},
+en:{alpha:"Alphabet and special sounds",
+ alphaP:"Chechen is written in Cyrillic with extra letters. The <b>palochka Ӏ</b> marks ejective or pharyngeal consonants.",
+ letter:"Letter",pron:"Approximate pronunciation",
+ rows:[["аь / оь / уь","front vowels: “e”, “ö” (German sch<b>ö</b>n), “ü” (German f<b>ü</b>r)"],
+  ["Ӏ","voiced pharyngeal consonant (like Arabic ʿayn ع)"],["хӀ","aspirated “h” (<i>h</i>ello)"],
+  ["хь","strong pharyngeal “h” (Arabic ح)"],["х","guttural “kh” (German Ba<i>ch</i>)"],
+  ["гӀ","“gh” (Arabic غ)"],["кх","uvular “q” (Arabic ق)"],
+  ["къ, кӀ, пӀ, тӀ, цӀ, чӀ","ejective consonants (k', p', t', ts', ch')"]],
+ cls:"Noun classes (agreement)",
+ clsP:"Every noun belongs to one of <b>6 classes</b>. Agreeing verbs and adjectives take a class prefix: <b>в-</b> (man), <b>й-</b> (woman), <b>б-</b>, <b>д-</b>… The verb “to be”: <span class=\"ce\">ву / ю / бу / ду</span>.",
+ ex:"Example",sens:"Meaning",
+ clsRows:[["стаг ву","the man is (class 1, в-)"],["зуда ю","the woman is (class 2, й-)"],["мотт бу","the language is (class б-)"],["хи ду","the water is (class д-)"]],
+ clsN:"That is why many phrases change depending on whether you address a man or a woman (ву/ю).",
+ cas:"Declension: 8 cases",
+ casP:"Nouns decline. Base suffixes: genitive <span class=\"ce\">-н</span>, dative <span class=\"ce\">-на</span>, ergative <span class=\"ce\">-о/-с</span>, instrumental <span class=\"ce\">-ца</span>, material <span class=\"ce\">-х</span>, comparative <span class=\"ce\">-л</span>, locative <span class=\"ce\">-хь/-га/-ра</span>. A real example — <span class=\"ce\">москал</span> (turkey):",
+ cCase:"Case",cSg:"Singular",cPl:"Plural",
+ casN:"The stem vowel often changes (мотт → меттан “of the language”). Known inflected forms are in the dictionary.",
+ vb:"Sentence and verb",
+ vbP:"Usual order: <b>Subject – Object – Verb</b> (SOV). An <b>ergative</b> language: the subject of a transitive verb takes the ergative (<span class=\"ce\">со</span> “I” → <span class=\"ce\">ас</span>). E.g. <span class=\"ce\">Ас нохчийн мотт ӏамабо</span> — “I am learning Chechen”.",
+ vbP2:"The verb agrees in <b>class</b> (в/й/б/д), not person: <span class=\"ce\">ван / ян / бан / дан</span> “to do”.",
+ refs:"References: J. Nichols (Berkeley), CNRS-LGIDF.",
+ cases:[["nominative","nominative"],["genitive","genitive"],["dative","dative"],["ergative","ergative"],["instrumental","instrumental"],["material","substantive"],["comparative","comparative degree"],["locative","locative"]]}
+};
+function renderGram(){
+  const g=GRAM[CURLANG]||GRAM[CURLANG==="ce"?"ru":"fr"]||GRAM.fr;
   let mrows="";
-  for(const [frc,enc] of cases){
-    const sg=W.find(e=>e.e===`${enc} singular of москал`||(enc==="nominative"&&e.c==="москал"&&e.e!=="nominative plural of москал"&&!e.e.includes(" of ")));
+  for(const [frc,enc] of g.cases){
+    const sg=W.find(e=>e.e===`${enc} singular of москал`);
     const pl=W.find(e=>e.e===`${enc} plural of москал`);
-    if(sg||pl) mrows+=`<tr><td>${frc}</td><td class="ce">${sg?esc(sg.c):"москал"}</td><td class="ce">${pl?esc(pl.c):"—"}</td></tr>`;
+    if(sg||pl||enc==="nominative")
+      mrows+=`<tr><td>${frc}</td><td class="ce">${sg?esc(sg.c):"москал"}</td><td class="ce">${pl?esc(pl.c):"—"}</td></tr>`;
   }
   $("gram-out").innerHTML=`
-  <div class="card gram">
-    <h2>Alphabet et sons particuliers</h2>
-    <p>Le tchétchène s'écrit en cyrillique, avec des lettres propres. La <b>palotchka Ӏ</b> marque des consonnes «&nbsp;éjectives&nbsp;» ou pharyngales (son produit avec un coup de glotte).</p>
-    <table><tr><th>Lettre</th><th>Prononciation approchée</th></tr>
-    <tr><td class="ce">аь / оь / уь</td><td>voyelles antérieures : « è », « eu » (fr. p<b>eu</b>r), « u » (fr. t<b>u</b>)</td></tr>
-    <tr><td class="ce">Ӏ</td><td>consonne pharyngale sonore (comme l'arabe ʿayn ع)</td></tr>
-    <tr><td class="ce">хӀ</td><td>« h » aspiré (angl. <i>h</i>ello)</td></tr>
-    <tr><td class="ce">хь</td><td>« h » pharyngal fort (arabe ح)</td></tr>
-    <tr><td class="ce">х</td><td>« kh » guttural (esp. <i>j</i>ota, all. Ba<i>ch</i>)</td></tr>
-    <tr><td class="ce">гӀ</td><td>« gh », r grasseyé (arabe غ)</td></tr>
-    <tr><td class="ce">кх</td><td>« q » uvulaire (arabe ق)</td></tr>
-    <tr><td class="ce">къ, кӀ, пӀ, тӀ, цӀ, чӀ</td><td>consonnes éjectives (k', p', t', ts', tch' « claquées »)</td></tr></table>
-  </div>
-  <div class="card gram">
-    <h2>Classes nominales (accord)</h2>
-    <p>Chaque nom appartient à l'une de <b>6 classes</b>. Les verbes et adjectifs qui s'accordent portent un préfixe de classe : <b>в-</b> (homme), <b>й-</b> (femme), <b>б-</b>, <b>д-</b>… Le verbe « être » : <span class="ce">ву / ю / бу / ду</span>.</p>
-    <table><tr><th>Exemple</th><th>Sens</th></tr>
-    <tr><td class="ce">стаг ву</td><td>l'homme est (classe 1, в-)</td></tr>
-    <tr><td class="ce">зуда ю</td><td>la femme est (classe 2, й-)</td></tr>
-    <tr><td class="ce">мотт бу</td><td>la langue est (classe б-)</td></tr>
-    <tr><td class="ce">хи ду</td><td>l'eau est (classe д-)</td></tr></table>
-    <p class="hint">C'est pour cela que plusieurs expressions changent selon qu'on parle à un homme ou à une femme (ву/ю).</p>
-  </div>
-  <div class="card gram">
-    <h2>Déclinaison : 8 cas</h2>
-    <p>Le nom se décline. Suffixes de base : génitif <span class="ce">-н</span>, datif <span class="ce">-на</span>, ergatif <span class="ce">-о/-с</span>, instrumental <span class="ce">-ца</span>, matériel <span class="ce">-х</span>, comparatif <span class="ce">-л</span>, locatif <span class="ce">-хь/-га/-ра</span>. Exemple réel tiré du Wiktionary — <span class="ce">москал</span> (dinde) :</p>
-    <table><tr><th>Cas</th><th>Singulier</th><th>Pluriel</th></tr>${mrows}</table>
-    <p class="hint">La voyelle du radical change souvent (ex. : мотт → меттан « de la langue »). Cherchez la forme dans le dictionnaire : les formes fléchies connues y sont référencées.</p>
-  </div>
-  <div class="card gram">
-    <h2>Phrase et verbe</h2>
-    <p>Ordre habituel : <b>Sujet – Objet – Verbe</b> (SOV). Le tchétchène est une langue <b>ergative</b> : le sujet d'un verbe transitif prend le cas ergatif (<span class="ce">со</span> « je » → <span class="ce">ас</span>). Ex. : <span class="ce">Ас нохчийн мотт ӏамабо</span> — « J'apprends la langue tchétchène ».</p>
-    <p>Le verbe ne s'accorde pas en personne, mais en <b>classe</b> (préfixe в/й/б/д) pour les verbes à initiale de classe : <span class="ce">ван / ян / бан / дан</span> « faire ».</p>
-    <p class="hint">Références : J. Nichols (Berkeley), fiche « Le tchétchène » du CNRS-LGIDF.</p>
-  </div>`;
-})();
+  <div class="card gram"><h2>${g.alpha}</h2><p>${g.alphaP}</p>
+    <table><tr><th>${g.letter}</th><th>${g.pron}</th></tr>
+    ${g.rows.map(r=>`<tr><td class="ce">${r[0]}</td><td>${r[1]}</td></tr>`).join("")}</table></div>
+  <div class="card gram"><h2>${g.cls}</h2><p>${g.clsP}</p>
+    <table><tr><th>${g.ex}</th><th>${g.sens}</th></tr>
+    ${g.clsRows.map(r=>`<tr><td class="ce">${r[0]}</td><td>${r[1]}</td></tr>`).join("")}</table>
+    <p class="hint">${g.clsN}</p></div>
+  <div class="card gram"><h2>${g.cas}</h2><p>${g.casP}</p>
+    <table><tr><th>${g.cCase}</th><th>${g.cSg}</th><th>${g.cPl}</th></tr>${mrows}</table>
+    <p class="hint">${g.casN}</p></div>
+  <div class="card gram"><h2>${g.vb}</h2><p>${g.vbP}</p><p>${g.vbP2}</p>
+    <p class="hint">${g.refs}</p></div>`;
+}
 
 /* ---------- import de fichiers (PDF, Word, images) ---------- */
 function loadScript(srcs){
@@ -583,8 +627,8 @@ async function preOcr(file){
 async function ocrImage(img,lang){
   if(!window.Tesseract && !await loadScript(CDN.tesseract)) throw new Error("OCR inaccessible (internet requis)");
   const r=await Tesseract.recognize(img,lang,{logger:m=>{
-    if(m.status==="recognizing text") impStatus(`OCR en cours… ${Math.round(m.progress*100)} %`);
-    else if(m.status==="loading language traineddata") impStatus("Téléchargement du modèle OCR…");
+    if(m.status==="recognizing text") impStatus(`OCR… ${Math.round(m.progress*100)} %`);
+    else if(m.status==="loading language traineddata") impStatus(T("ocrModel"));
   }});
   return r.data.text;
 }
@@ -606,7 +650,7 @@ async function extractFile(file){
     const forceOcr=$("imp-ocr").checked;
     if(!forceOcr){
       for(let i=1;i<=doc.numPages;i++){
-        impStatus(`Lecture du PDF : page ${i}/${doc.numPages}…`);
+        impStatus(`PDF : ${i}/${doc.numPages}…`);
         const tc=await (await doc.getPage(i)).getTextContent();
         text+=tc.items.map(it=>it.str).join(" ")+"\n";
       }
@@ -615,7 +659,7 @@ async function extractFile(file){
       text="";
       const n=Math.min(doc.numPages,20);
       for(let i=1;i<=n;i++){
-        impStatus(`OCR du PDF : page ${i}/${n}…`);
+        impStatus(`OCR : ${i}/${n}…`);
         const p=await doc.getPage(i), vp=p.getViewport({scale:2});
         const cv=document.createElement("canvas");cv.width=vp.width;cv.height=vp.height;
         await p.render({canvasContext:cv.getContext("2d"),viewport:vp}).promise;
@@ -625,7 +669,7 @@ async function extractFile(file){
     }
   }
   else if(["png","jpg","jpeg","webp","bmp","gif"].includes(ext)){
-    impStatus("Préparation de l'image (netteté, contraste)…");
+    impStatus(T("impPrep"));
     text=await ocrImage(await preOcr(file),ocrLang);
   }
   else if(ext==="doc"){ throw new Error("Format .doc ancien non pris en charge : enregistrez le fichier en .docx"); }
@@ -637,12 +681,11 @@ async function extractFile(file){
 async function handleFile(file){
   if(!file) return;
   try{
-    impStatus("Lecture de « "+file.name+" »…");
+    impStatus(T("impReading")+" « "+file.name+" »…");
     const t=await extractFile(file);
     $("imp-text").value=t;
-    impStatus(t?`Texte extrait (${t.length} caractères). Relisez, corrigez si besoin, puis « Traduire ».`
-              :"Aucun texte détecté. S'il s'agit d'un scan, cochez « forcer l'OCR ».");
-  }catch(e){ impStatus("Erreur : "+(e.message||e)); }
+    impStatus(t?T("impDone").replace("{n}",t.length):T("impNone"));
+  }catch(e){ impStatus(T("err")+(e.message||e)); }
 }
 (function(){
   const drop=$("drop"), fi=$("file-in");
@@ -663,42 +706,145 @@ async function handleFile(file){
 })();
 
 /* ---------- langue de l'interface ---------- */
+let CURLANG="fr";
 const I18N={
  fr:{trad:"Traducteur",dico:"Dictionnaire",phrases:"Expressions",nombres:"Nombres",gram:"Grammaire","import":"Importer",apropos:"À propos",
-  btnTrad:"Traduire",mt:"Traduction en ligne (Google) pour les phrases",manu:"✍ manuscrit",
-  phTrad:"Mot ou phrase… (клавиатура нохчийн ↓)",phDico:"Chercher un mot (fr, ce, ru, en)… ex : loup, борз",
-  phNum:"Entrez un nombre (0–999 999)",impTrad:"Traduire ce texte →",sub:"Noxchiyn Mott · traducteur tchétchène"},
+  btnTrad:"Traduire",mt:"Traduction en ligne (Google) pour les phrases",
+  phTrad:"Mot ou phrase…",phDico:"Chercher un mot (fr, ce, ru, en)… ex : loup, борз",
+  phNum:"Entrez un nombre (0–999 999)",impTrad:"Traduire ce texte →",sub:"Noxchiyn Mott · traducteur tchétchène",
+  lnFr:"Français",lnCe:"Tchétchène (нохчийн)",lnRu:"Russe",lnEn:"Anglais",
+  docLang:"Langue du document :",ocrForce:"forcer l'OCR (document scanné)",dropTxt:"Glissez un fichier ici",
+  impHint:"Importez un PDF, Word (.docx), une image (PNG, JPG…) ou un .txt : le texte est extrait (OCR pour les scans) puis traduit. Une photo nette et cadrée donne le meilleur OCR.",
+  phrasesHint:"Expressions attestées dans les manuels. Le tchétchène distingue l'interlocuteur homme (ву) et femme (ю).",
+  numHint:"Le tchétchène compte en base 20 : 30 = « vingt et dix », 40 = « deux-vingts »…",
+  space:"espace",cardExpr:"Expressions",cardDict:"Dictionnaire",cardWbw:"Mot à mot",
+  cardNear:"Expressions proches du sens",viaRu:"via le russe",cardMT:"Traduction automatique",
+  mtQuery:"Interrogation de Google Translate (directe + pivot russe)…",
+  mtWarn:"⚠ Qualité limitée pour le tchétchène — vérifiez les mots importants avec le dictionnaire.",
+  mtRaw:"Version brute de Google",mtOther:"Autre version",mtSubs:"✔ Mots russes laissés par Google, remplacés : ",
+  mtLong:"Texte long : seuls les 1 800 premiers caractères ont été traduits.",
+  mtOffline:"Service en ligne inaccessible (hors ligne ou accès bloqué).",mtOpen:"Ouvrir dans Google Translate ↗",
+  mtDirect:"directe",mtPivot:"pivot russe",
+  badgeMT:"MT en ligne",badgeManual:"Manuel",badgeDict:"dictionnaire",badgeWord:"MT mot isolé",
+  noRes:"Aucun résultat dans le dictionnaire. Essayez la traduction en ligne ou une autre orthographe (ӏ / 1, аь…).",
+  noRes2:"Aucun résultat.",variantOf:"variante de",
+  impReading:"Lecture de",impPrep:"Préparation de l'image…",
+  impDone:"Texte extrait ({n} caractères). Relisez, corrigez si besoin, puis traduisez.",
+  impNone:"Aucun texte détecté. S'il s'agit d'un scan, cochez « forcer l'OCR ».",err:"Erreur : ",ocrModel:"Téléchargement du modèle OCR…",
+  "cat:Salutations":"Salutations","cat:Politesse":"Politesse","cat:Base":"Base","cat:Conversation":"Conversation","cat:Langue":"Langue","cat:Sentiments":"Sentiments",
+  numN:"Nombre",numCE:"Tchétchène",numTL:"Translit.",numST:"Structure",
+  aboutHtml:`<h2>Noxchiyn Mott — Нохчийн мотт</h2>
+   <p>Dictionnaire et traducteur pour la langue tchétchène, construit à partir de sources publiées et vérifiables. Chaque résultat affiche sa source :</p>
+   <p><span class="badge b-high">dictionnaire</span> dictionnaires publiés (Wiktionary, Matsiev…) · <span class="badge b-mid">Manuel</span> méthodes de langue · <span class="badge b-low">MT en ligne</span> traduction automatique, à vérifier.</p>
+   <p>Sources : Wiktionnaires anglais et russe (kaikki.org, CC BY-SA) · dictionnaire tchétchène-russe de Matsiev, dictionnaire d'anatomie Bersanov et vocabulaire BaltoSlav (corpus ouvert arXiv:2507.12672) · ressources pédagogiques (tchetchene.free.fr, Waynakh Online, LIMBA) · grammaire d'après J. Nichols et le CNRS-LGIDF.</p>
+   <p class="hint">Dictionnaire disponible hors ligne · installable sur téléphone (PWA).</p>`},
  ru:{trad:"Переводчик",dico:"Словарь",phrases:"Выражения",nombres:"Числа",gram:"Грамматика","import":"Импорт",apropos:"О программе",
-  btnTrad:"Перевести",mt:"Онлайн-перевод (Google) для фраз",manu:"✍ рукописный",
+  btnTrad:"Перевести",mt:"Онлайн-перевод (Google) для фраз",
   phTrad:"Слово или фраза…",phDico:"Поиск слова (fr, ce, ru, en)… напр. волк, борз",
-  phNum:"Введите число (0–999 999)",impTrad:"Перевести этот текст →",sub:"Noxchiyn Mott · чеченский переводчик"},
+  phNum:"Введите число (0–999 999)",impTrad:"Перевести этот текст →",sub:"Noxchiyn Mott · чеченский переводчик",
+  lnFr:"Французский",lnCe:"Чеченский (нохчийн)",lnRu:"Русский",lnEn:"Английский",
+  docLang:"Язык документа:",ocrForce:"принудительный OCR (скан)",dropTxt:"Перетащите файл сюда",
+  impHint:"Импортируйте PDF, Word (.docx), изображение (PNG, JPG…) или .txt: текст извлекается (OCR для сканов) и переводится. Чёткое фото даёт лучший OCR.",
+  phrasesHint:"Выражения из учебников. Чеченский различает собеседника-мужчину (ву) и женщину (ю).",
+  numHint:"Чеченский счёт — двадцатеричный: 30 = «двадцать и десять», 40 = «два-двадцать»…",
+  space:"пробел",cardExpr:"Выражения",cardDict:"Словарь",cardWbw:"Пословно",
+  cardNear:"Близкие по смыслу выражения",viaRu:"через русский",cardMT:"Машинный перевод",
+  mtQuery:"Запрос к Google Translate (прямой + через русский)…",
+  mtWarn:"⚠ Качество перевода для чеченского ограничено — проверяйте важные слова по словарю.",
+  mtRaw:"Исходный вариант Google",mtOther:"Другой вариант",mtSubs:"✔ Оставленные Google русские слова заменены: ",
+  mtLong:"Длинный текст: переведены только первые 1 800 знаков.",
+  mtOffline:"Онлайн-сервис недоступен (нет сети или доступ заблокирован).",mtOpen:"Открыть в Google Translate ↗",
+  mtDirect:"прямой",mtPivot:"через русский",
+  badgeMT:"онлайн-МП",badgeManual:"Учебник",badgeDict:"словарь",badgeWord:"МП (слово)",
+  noRes:"В словаре ничего не найдено. Попробуйте онлайн-перевод или другое написание (ӏ / 1, аь…).",
+  noRes2:"Ничего не найдено.",variantOf:"вариант слова",
+  impReading:"Чтение",impPrep:"Подготовка изображения…",
+  impDone:"Текст извлечён ({n} знаков). Проверьте и переводите.",
+  impNone:"Текст не обнаружен. Если это скан, включите «принудительный OCR».",err:"Ошибка: ",ocrModel:"Загрузка модели OCR…",
+  "cat:Salutations":"Приветствия","cat:Politesse":"Вежливость","cat:Base":"Основное","cat:Conversation":"Разговор","cat:Langue":"Язык","cat:Sentiments":"Чувства",
+  numN:"Число",numCE:"Чеченский",numTL:"Транслит.",numST:"Структура",
+  aboutHtml:`<h2>Noxchiyn Mott — Нохчийн мотт</h2>
+   <p>Словарь и переводчик чеченского языка, построенный на опубликованных и проверяемых источниках. Каждый результат показывает свой источник:</p>
+   <p><span class="badge b-high">словарь</span> изданные словари (Wiktionary, Мациев…) · <span class="badge b-mid">Учебник</span> учебные пособия · <span class="badge b-low">онлайн-МП</span> машинный перевод, требует проверки.</p>
+   <p>Источники: английский и русский Викисловари (kaikki.org, CC BY-SA) · чеченско-русский словарь Мациева, анатомический словарь Берсанова, словарь BaltoSlav (открытый корпус arXiv:2507.12672) · учебные ресурсы (tchetchene.free.fr, Waynakh Online, LIMBA) · грамматика по Дж. Николс и CNRS-LGIDF.</p>
+   <p class="hint">Словарь работает офлайн · устанавливается на телефон (PWA).</p>`},
  en:{trad:"Translator",dico:"Dictionary",phrases:"Phrases",nombres:"Numbers",gram:"Grammar","import":"Import",apropos:"About",
-  btnTrad:"Translate",mt:"Online translation (Google) for sentences",manu:"✍ cursive",
+  btnTrad:"Translate",mt:"Online translation (Google) for sentences",
   phTrad:"Word or sentence…",phDico:"Search a word (fr, ce, ru, en)… e.g. wolf, борз",
-  phNum:"Enter a number (0–999,999)",impTrad:"Translate this text →",sub:"Noxchiyn Mott · Chechen translator"},
+  phNum:"Enter a number (0–999,999)",impTrad:"Translate this text →",sub:"Noxchiyn Mott · Chechen translator",
+  lnFr:"French",lnCe:"Chechen (нохчийн)",lnRu:"Russian",lnEn:"English",
+  docLang:"Document language:",ocrForce:"force OCR (scanned)",dropTxt:"Drop a file here",
+  impHint:"Import a PDF, Word (.docx), image (PNG, JPG…) or .txt: the text is extracted (OCR for scans) and translated. A sharp, well-framed photo gives the best OCR.",
+  phrasesHint:"Phrases attested in textbooks. Chechen distinguishes a male (ву) and a female (ю) addressee.",
+  numHint:"Chechen counts in base 20: 30 = “twenty and ten”, 40 = “two-twenties”…",
+  space:"space",cardExpr:"Phrases",cardDict:"Dictionary",cardWbw:"Word by word",
+  cardNear:"Expressions close in meaning",viaRu:"via Russian",cardMT:"Machine translation",
+  mtQuery:"Querying Google Translate (direct + Russian pivot)…",
+  mtWarn:"⚠ Limited quality for Chechen — check important words in the dictionary.",
+  mtRaw:"Google's raw version",mtOther:"Other version",mtSubs:"✔ Russian words left by Google, replaced: ",
+  mtLong:"Long text: only the first 1,800 characters were translated.",
+  mtOffline:"Online service unreachable (offline or blocked).",mtOpen:"Open in Google Translate ↗",
+  mtDirect:"direct",mtPivot:"Russian pivot",
+  badgeMT:"online MT",badgeManual:"Textbook",badgeDict:"dictionary",badgeWord:"MT (word)",
+  noRes:"No dictionary result. Try online translation or another spelling (ӏ / 1, аь…).",
+  noRes2:"No results.",variantOf:"variant of",
+  impReading:"Reading",impPrep:"Preparing image…",
+  impDone:"Text extracted ({n} chars). Review, then translate.",
+  impNone:"No text detected. If it is a scan, enable “force OCR”.",err:"Error: ",ocrModel:"Downloading OCR model…",
+  "cat:Salutations":"Greetings","cat:Politesse":"Politeness","cat:Base":"Basics","cat:Conversation":"Conversation","cat:Langue":"Language","cat:Sentiments":"Feelings",
+  numN:"Number",numCE:"Chechen",numTL:"Translit.",numST:"Structure",
+  aboutHtml:`<h2>Noxchiyn Mott — Нохчийн мотт</h2>
+   <p>A dictionary and translator for the Chechen language, built from published, verifiable sources. Every result shows its source:</p>
+   <p><span class="badge b-high">dictionary</span> published dictionaries (Wiktionary, Matsiev…) · <span class="badge b-mid">Textbook</span> language courses · <span class="badge b-low">online MT</span> machine translation, to be verified.</p>
+   <p>Sources: English and Russian Wiktionaries (kaikki.org, CC BY-SA) · Matsiev Chechen-Russian dictionary, Bersanov anatomy dictionary, BaltoSlav vocabulary (open corpus arXiv:2507.12672) · learning resources (tchetchene.free.fr, Waynakh Online, LIMBA) · grammar after J. Nichols and CNRS-LGIDF.</p>
+   <p class="hint">Dictionary works offline · installable on phones (PWA).</p>`},
  ce:{trad:"Гочдар",dico:"Дошам",phrases:"Аларш",nombres:"Терахьдешнаш",gram:"Грамматика","import":"Импорт",apropos:"Лаьцна",
-  btnTrad:"Гочде",mt:"Онлайн-гочдар (Google)",manu:"✍ куьйган йоза",
+  btnTrad:"Гочде",mt:"Онлайн-гочдар (Google)",
   phTrad:"Дош я предложени…",phDico:"Дош лаха… (масала : борз)",
-  phNum:"Терахь язде (0–999 999)",impTrad:"ХӀара йоза гочде →",sub:"Нохчийн мотт · нохчийн гочдархо"}
+  phNum:"Терахь язде (0–999 999)",impTrad:"ХӀара йоза гочде →",sub:"Нохчийн мотт · нохчийн гочдархо",
+  lnFr:"Французийн",lnCe:"Нохчийн",lnRu:"Оьрсийн",lnEn:"Ингалсан",
+  docLang:"Документан мотт:",cardDict:"Дошам",cardExpr:"Аларш",badgeDict:"дошам",
+  "cat:Salutations":"Маршалла","cat:Langue":"Мотт",numCE:"Нохчийн",numN:"Терахь"}
 };
+function T(k){
+  const l=I18N[CURLANG]||{};
+  if(l[k]!==undefined) return l[k];
+  if(CURLANG==="ce"&&I18N.ru[k]!==undefined) return I18N.ru[k];
+  return I18N.fr[k]!==undefined?I18N.fr[k]:k;
+}
 function applyLang(l){
-  const t=k=>(I18N[l]&&I18N[l][k])||I18N.fr[k];
-  document.querySelectorAll("#tabs button[data-tab]").forEach(b=>{b.textContent=t(b.dataset.tab);});
-  $("btn-trad").textContent=t("btnTrad");
-  const m=$("lbl-mt"); if(m) m.textContent=t("mt");
-  const c=$("btn-cursive"); if(c) c.textContent=t("manu");
-  $("trad-in").placeholder=t("phTrad");
-  $("dico-q").placeholder=t("phDico");
-  $("num-in").placeholder=t("phNum");
-  const it=$("imp-trad"); if(it) it.textContent=t("impTrad");
-  const st=$("sub-title"); if(st) st.textContent=t("sub");
+  CURLANG=l;
+  document.documentElement.lang=(l==="ce"?"ce":l);
+  document.querySelectorAll("#tabs button[data-tab]").forEach(b=>{b.textContent=T(b.dataset.tab);});
+  $("btn-trad").textContent=T("btnTrad");
+  const set=(id,k)=>{const el=$(id);if(el)el.textContent=T(k);};
+  set("lbl-mt","mt");set("sub-title","sub");set("lbl-imp-lang","docLang");set("lbl-ocr","ocrForce");
+  set("drop-text","dropTxt");set("imp-hint","impHint");set("phrases-hint","phrasesHint");set("num-hint","numHint");
+  $("trad-in").placeholder=T("phTrad");
+  $("dico-q").placeholder=T("phDico");
+  $("num-in").placeholder=T("phNum");
+  const it=$("imp-trad"); if(it) it.textContent=T("impTrad");
+  // noms des langues dans les sélecteurs
+  const LN={fr:T("lnFr"),ce:T("lnCe"),ru:T("lnRu"),en:T("lnEn")};
+  ["src-lang","dst-lang","imp-lang"].forEach(id=>{
+    const sel=$(id); if(!sel||!sel.options) return;
+    for(const o of sel.options){ if(LN[o.value]) o.textContent=LN[o.value]; }
+  });
+  document.querySelectorAll(".kbd-space").forEach(b=>{b.textContent=T("space");});
+  if(typeof renderPhrases==="function") renderPhrases();
+  if(typeof renderNumTable==="function") renderNumTable();
+  if(typeof renderGram==="function") renderGram();
+  const ab=$("about-out"); if(ab) ab.innerHTML=T("aboutHtml");
 }
 (function(){
   const sel=$("ui-lang"); if(!sel) return;
   let l="fr"; try{l=localStorage.getItem("nm_uilang")||"fr";}catch(e){}
-  sel.value=l; applyLang(l);
+  sel.value=l;
   sel.addEventListener("change",()=>{ applyLang(sel.value);
     try{localStorage.setItem("nm_uilang",sel.value);}catch(e){} });
+  // applyLang est appelé en fin de script, une fois tout défini
+  window.addEventListener("DOMContentLoaded",()=>applyLang(sel.value));
+  setTimeout(()=>applyLang(sel.value),0);
 })();
 
 /* ---------- affichage manuscrit (cursive attachée) ---------- */

@@ -25,7 +25,7 @@ header{background:var(--header);color:#fff;padding:14px 18px 0;}
 body{transition:background .25s,color .25s}
 .brand{display:flex;align-items:center;gap:12px;max-width:920px;margin:0 auto}
 .ui-lang{margin-left:auto;background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.35);border-radius:8px;padding:5px 8px;font-size:.85rem}
-.ui-lang option{color:#22302a}
+.ui-lang option{color:#22302a;background:#ffffff}
 .logo{width:40px;height:40px;color:#fff;flex:none;opacity:.95}
 h1{margin:0;font-size:1.45rem;letter-spacing:.5px}
 .sub{margin:0 0 4px;font-size:.85rem;color:#cfe3d6}
@@ -121,4 +121,13 @@ footer .dot{color:var(--gold)}
 
 @media(max-width:600px){
   h1{font-size:1.2rem}
-  nav#tabs button{padding:8px 9px;fo
+  nav#tabs button{padding:8px 9px;font-size:.85rem}
+  .lang-bar{flex-wrap:wrap}
+}
+
+/* lisibilité mode sombre : liens, menus, sélection */
+a{color:var(--green);text-decoration-color:var(--gold)}
+a:hover{color:var(--green-d)}
+select option{color:var(--ink);background:var(--card)}
+::selection{background:var(--gold);color:#22302a}
+body.dark input,body.dark textarea,body.dark select{color-scheme:dark}
