@@ -179,7 +179,10 @@ function analyzeCe(text){
   const parts=text.split(/([^а-яёА-ЯЁӏӀ-]+)/);
   let leaks=0, unknown=0; const subs=[]; const out=[];
   for(const w of parts){
-    if(!/[а-яё]/i.test(w)){out.push(w);continue;}
+    if(!/[а-яё]/i.test(w)){
+      if(/[a-z]{2,}/i.test(w)) unknown+=2; // mot resté en alphabet latin : pas du tchétchène
+      out.push(w);continue;
+    }
     if(idxCe.has(norm(w))){out.push(w);continue;}
     const hit=ruLookup(w.toLowerCase());
     if(hit){leaks++;subs.push({ru:w,ce:hit.c,src:hit.s==="dico"?"dictionnaire":hit.s});out.push(hit.c);}
@@ -332,7 +335,17 @@ function phraseMatches(q,src){
   return res.slice(0,10);
 }
 async function doTranslate(){
-  const q=$("trad-in").value.trim(), src=$("src-lang").value, dst=$("dst-lang").value;
+  const q=$("trad-in").value.trim();
+  let src=$("src-lang").value, dst=$("dst-lang").value;
+  // auto-détection : si le script du texte ne correspond pas à la langue source choisie
+  const hasCyr=isCyr(q);
+  if(q&&!hasCyr&&(src==="ce"||src==="ru")){
+    src=(dedupe(lookup(q,"en").exact).length>dedupe(lookup(q,"fr").exact).length)?"en":"fr";
+    $("src-lang").value=src;
+  }else if(q&&hasCyr&&(src==="fr"||src==="en")){
+    src="ce"; $("src-lang").value=src;
+  }
+  if(dst===src){ dst=(src==="ce")?"fr":"ce"; $("dst-lang").value=dst; }
   const out=$("trad-out"); out.innerHTML="";
   if(!q) return;
   const words=q.split(/\s+/);
