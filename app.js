@@ -902,13 +902,12 @@ function applyLang(l){
 (function(){
   const b=$("btn-install"); if(!b) return;
   const standalone=window.matchMedia&&window.matchMedia("(display-mode: standalone)").matches;
-  if(standalone) return; // déjà installée
+  if(standalone) return; // déjà installée : pas de bouton
+  b.style.display=""; // toujours visible dans un navigateur
   let deferred=null;
   window.addEventListener("beforeinstallprompt",e=>{
-    e.preventDefault(); deferred=e; b.style.display="";
+    e.preventDefault(); deferred=e;
   });
-  const isIOS=/iphone|ipad|ipod/i.test(navigator.userAgent||"");
-  if(isIOS) b.style.display="";
   b.addEventListener("click",async()=>{
     if(deferred){ deferred.prompt(); try{await deferred.userChoice;}catch(e){} deferred=null; b.style.display="none"; }
     else alert(T("installHow"));
