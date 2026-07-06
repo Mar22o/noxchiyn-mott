@@ -1,0 +1,112 @@
+/* Noxchiyn Mott — style sobre, identité tchétchène (vert/blanc/rouge/or du drapeau) */
+:root{
+  --green:#0f5c33; --green-d:#0a4526; --red:#b3272d; --gold:#c9a227;
+  --bg:#f7f6f2; --card:#ffffff; --ink:#22302a; --mut:#6b7a72; --line:#e2e0d8;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:"Segoe UI",system-ui,-apple-system,Roboto,sans-serif;background:var(--bg);color:var(--ink);line-height:1.5}
+
+/* bande d'ornement nakh (motif géométrique) */
+.ornament-band{height:10px;background:
+ repeating-linear-gradient(90deg,var(--green) 0 24px,var(--gold) 24px 30px,var(--red) 30px 54px,var(--gold) 54px 60px);}
+
+header{background:var(--green);color:#fff;padding:14px 18px 0;}
+.brand{display:flex;align-items:center;gap:12px;max-width:920px;margin:0 auto}
+.logo{width:40px;height:40px;color:#fff;flex:none;opacity:.95}
+h1{margin:0;font-size:1.45rem;letter-spacing:.5px}
+.sub{margin:0 0 4px;font-size:.85rem;color:#cfe3d6}
+nav#tabs{max-width:920px;margin:10px auto 0;display:flex;gap:2px;flex-wrap:wrap}
+nav#tabs button{background:transparent;border:none;color:#d8e8dd;padding:9px 13px;font-size:.92rem;cursor:pointer;border-radius:8px 8px 0 0}
+nav#tabs button:hover{background:rgba(255,255,255,.12)}
+nav#tabs button.active{background:var(--bg);color:var(--green);font-weight:600}
+
+main{max-width:920px;margin:0 auto;padding:18px 16px 40px}
+.tab{display:none}
+.tab.active{display:block}
+
+/* traducteur */
+.lang-bar{display:flex;gap:8px;align-items:center;margin-bottom:10px}
+select,input[type=search],input[type=number],textarea{font:inherit;padding:9px 12px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink)}
+select:focus,input:focus,textarea:focus{outline:2px solid var(--green);outline-offset:1px}
+#swap{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 12px;font-size:1.05rem;cursor:pointer}
+#swap:hover{background:#eef3ef}
+textarea{width:100%;resize:vertical}
+input[type=search],input[type=number]{width:100%}
+.actions{display:flex;gap:14px;align-items:center;margin:10px 0;flex-wrap:wrap}
+button.primary{background:var(--green);color:#fff;border:none;border-radius:10px;padding:10px 22px;font:inherit;font-weight:600;cursor:pointer}
+button.primary:hover{background:var(--green-d)}
+.mt-toggle{font-size:.85rem;color:var(--mut);display:flex;gap:6px;align-items:center}
+
+/* clavier virtuel */
+.kbd{display:flex;flex-wrap:wrap;gap:5px;margin:8px 0;align-items:center}
+.kbd button{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:5px 9px;font:inherit;font-size:1rem;cursor:pointer;min-width:34px}
+.kbd button:hover{border-color:var(--green);background:#eef3ef}
+.kbd .kbd-toggle{background:var(--green);color:#fff;border-color:var(--green);font-size:1.05rem}
+.kbd .kbd-toggle.on,.kbd button.on{background:var(--gold);border-color:var(--gold);color:#22302a}
+.kbd-full{width:100%;background:#edf3ee;border:1px solid var(--line);border-radius:12px;padding:8px}
+.kbd-row{display:flex;justify-content:center;gap:5px;margin:4px 0;flex-wrap:wrap}
+.kbd-space{min-width:180px !important;color:var(--mut)}
+
+/* écriture manuscrite attachée (cursive cyrillique) */
+body.cursive .ce, body.cursive .num-result,
+body.cursive .kbd button[data-k], body.cursive .kbd-space{
+  font-family:"Marck Script","Bad Script","Segoe Script",cursive !important;
+  font-size:1.45em;line-height:1.25;font-weight:400}
+body.cursive .kbd button[data-k]{font-size:1.25em;padding:2px 9px}
+body.cursive #trad-in, body.cursive #dico-q{
+  font-family:"Marck Script","Bad Script","Segoe Script",cursive !important;font-size:1.2em}
+
+/* sens multiples groupés */
+.senses{flex:1;min-width:220px}
+.sense{padding:2px 0;font-size:.95rem;border-bottom:1px dotted #eee9df}
+.sense:last-child{border-bottom:none}
+.cursive-btn{margin-left:auto;background:var(--card);border:1px dashed var(--mut);border-radius:8px;padding:8px 14px;font:inherit;cursor:pointer;color:var(--mut)}
+.cursive-btn:hover{border-color:var(--gold);color:var(--ink)}
+.cursive-btn.on{background:var(--gold);border:1px solid var(--gold);color:#22302a;font-weight:600}
+
+/* import de fichiers */
+.drop{border:2px dashed var(--line);border-radius:14px;background:var(--card);padding:22px;text-align:center;color:var(--mut);margin:10px 0}
+.drop.over{border-color:var(--green);background:#eef3ef}
+.drop p{margin:0 0 8px}
+
+/* cartes de résultats */
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin:10px 0;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.card h2{margin:0 0 8px;font-size:1.05rem;color:var(--green)}
+.entry{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:baseline;padding:7px 2px;border-bottom:1px dashed var(--line)}
+.entry:last-child{border-bottom:none}
+.entry .ce{font-weight:700;font-size:1.06rem}
+.entry .tr{flex:1;min-width:180px}
+.entry .pos{color:var(--mut);font-size:.78rem;font-style:italic}
+.entry .lat{color:var(--mut);font-size:.82rem}
+.badge{display:inline-block;font-size:.7rem;padding:2px 8px;border-radius:20px;color:#fff;vertical-align:middle}
+.b-high{background:var(--green)}
+.b-mid{background:var(--gold)}
+.b-low{background:var(--red)}
+.mt-box{border-left:4px solid var(--red)}
+.mt-box .warn{color:var(--red);font-size:.8rem;margin:6px 0 0}
+.hint{color:var(--mut);font-size:.85rem}
+.empty{color:var(--mut);font-style:italic;padding:14px}
+
+/* nombres */
+.num-result{font-size:1.3rem;font-weight:700;color:var(--green);margin:12px 0;min-height:1.6em}
+table{border-collapse:collapse;width:100%;background:var(--card);border-radius:10px;overflow:hidden}
+th,td{padding:7px 11px;text-align:left;border-bottom:1px solid var(--line);font-size:.92rem}
+th{background:#edf3ee;color:var(--green)}
+tr:last-child td{border-bottom:none}
+
+/* grammaire */
+.gram h2{color:var(--green);font-size:1.1rem;margin:20px 0 6px}
+.gram p{margin:6px 0}
+.gram .ce{font-weight:600}
+
+.about ul{padding-left:20px}
+.about h3{color:var(--green);font-size:.98rem;margin:14px 0 4px}
+
+footer{text-align:center;color:var(--mut);font-size:.8rem;padding:18px;border-top:1px solid var(--line)}
+footer .dot{color:var(--gold)}
+
+@media(max-width:600px){
+  h1{font-size:1.2rem}
+  nav#tabs button{padding:8px 9px;font-size:.85rem}
+  .lang-bar{flex-wrap:wrap}
+}

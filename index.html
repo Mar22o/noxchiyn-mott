@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Noxchiyn Mott — Нохчийн мотт</title>
+<meta name="description" content="Traducteur et dictionnaire tchétchène ↔ français">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#0f5c33">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Marck+Script&family=Bad+Script&display=swap">
+<link rel="stylesheet" href="style.css?v=4">
+</head>
+<body>
+<div class="ornament-band" aria-hidden="true"></div>
+<header>
+  <div class="brand">
+    <svg class="logo" viewBox="0 0 48 48" aria-hidden="true"><path d="M18 44 L20 14 L16 10 L24 3 L32 10 L28 14 L30 44 Z" fill="currentColor"/><rect x="21.5" y="20" width="5" height="7" rx="1" fill="#f7f6f2"/></svg>
+    <div>
+      <h1>Нохчийн мотт</h1>
+      <p class="sub">Noxchiyn Mott · traducteur tchétchène</p>
+    </div>
+  </div>
+  <nav id="tabs">
+    <button data-tab="trad" class="active">Traducteur</button>
+    <button data-tab="dico">Dictionnaire</button>
+    <button data-tab="phrases">Expressions</button>
+    <button data-tab="nombres">Nombres</button>
+    <button data-tab="gram">Grammaire</button>
+    <button data-tab="import">Importer</button>
+    <button data-tab="apropos">À propos</button>
+  </nav>
+</header>
+
+<main>
+<!-- ===== TRADUCTEUR ===== -->
+<section id="tab-trad" class="tab active">
+  <div class="lang-bar">
+    <select id="src-lang">
+      <option value="fr">Français</option>
+      <option value="ce">Тchétchène (нохчийн)</option>
+      <option value="ru">Russe</option>
+      <option value="en">Anglais</option>
+    </select>
+    <button id="swap" title="Inverser">⇄</button>
+    <select id="dst-lang">
+      <option value="ce">Тchétchène (нохчийн)</option>
+      <option value="fr">Français</option>
+      <option value="ru">Russe</option>
+      <option value="en">Anglais</option>
+    </select>
+  </div>
+  <textarea id="trad-in" rows="3" placeholder="Mot ou phrase… (клавиатура нохчийн ↓)" spellcheck="false"></textarea>
+  <div id="kbd" class="kbd"></div>
+  <div class="actions">
+    <button id="btn-trad" class="primary">Traduire</button>
+    <label class="mt-toggle"><input type="checkbox" id="use-mt" checked> Traduction en ligne (Google) pour les phrases</label>
+    <button id="btn-cursive" class="cursive-btn" title="Afficher le tchétchène en écriture manuscrite attachée">✍ manuscrit</button>
+  </div>
+  <div id="trad-out"></div>
+</section>
+
+<!-- ===== DICTIONNAIRE ===== -->
+<section id="tab-dico" class="tab">
+  <input id="dico-q" type="search" placeholder="Chercher un mot (fr, ce, ru, en)… ex : loup, борз" spellcheck="false">
+  <div id="kbd2" class="kbd"></div>
+  <p class="hint" id="dico-stats"></p>
+  <div id="dico-out"></div>
+</section>
+
+<!-- ===== EXPRESSIONS ===== -->
+<section id="tab-phrases" class="tab">
+  <p class="hint">Expressions courantes attestées dans les manuels (LIMBA, Waynakh…). Le tchétchène distingue souvent l'interlocuteur homme (ву/в-) et femme (ю/й-).</p>
+  <div id="phrases-out"></div>
+</section>
+
+<!-- ===== NOMBRES ===== -->
+<section id="tab-nombres" class="tab">
+  <p class="hint">Le tchétchène compte en base 20 (vigésimal) : 30 = « vingt et dix », 40 = « deux-vingts »…</p>
+  <input id="num-in" type="number" min="0" max="999999" placeholder="Entrez un nombre (0–999 999)">
+  <div id="num-out" class="num-result"></div>
+  <div id="num-table"></div>
+</section>
+
+<!-- ===== GRAMMAIRE ===== -->
+<section id="tab-gram" class="tab">
+  <div id="gram-out"></div>
+</section>
+
+<!-- ===== IMPORTER ===== -->
+<section id="tab-import" class="tab">
+  <p class="hint">Importez un document — <b>PDF, Word (.docx), image (PNG, JPG…), texte (.txt)</b> — pour en extraire le texte puis le traduire. Les images et PDF scannés passent par reconnaissance de caractères (OCR, nécessite internet au premier usage).<br>
+  <b>Conseils pour un bon OCR :</b> texte <b>imprimé</b> (l'écriture manuscrite n'est pas reconnue), photo droite et nette, bien éclairée, cadrée sur le texte, fond uni. Recadrez l'image avant l'import si elle contient autre chose que du texte.</p>
+  <div id="drop" class="drop">
+    <p>Glissez un fichier ici<br>ou</p>
+    <input type="file" id="file-in" accept=".pdf,.docx,.png,.jpg,.jpeg,.webp,.bmp,.gif,.txt">
+  </div>
+  <div class="actions">
+    <label>Langue du document :
+      <select id="imp-lang">
+        <option value="ce">tchétchène (cyrillique)</option>
+        <option value="ru">russe</option>
+        <option value="fr">français</option>
+        <option value="en">anglais</option>
+      </select></label>
+    <label class="mt-toggle"><input type="checkbox" id="imp-ocr"> forcer l'OCR (PDF scanné)</label>
+  </div>
+  <p id="imp-status" class="hint"></p>
+  <textarea id="imp-text" rows="9" placeholder="Le texte extrait apparaîtra ici (modifiable avant traduction)…" spellcheck="false"></textarea>
+  <div class="actions">
+    <button id="imp-trad" class="primary">Traduire ce texte →</button>
+    <span class="hint">Les .doc anciens ne sont pas pris en charge : enregistrez-les en .docx.</span>
+  </div>
+</section>
+
+<!-- ===== À PROPOS ===== -->
+<section id="tab-apropos" class="tab">
+  <div class="card about">
+    <h2>Noxchiyn Mott</h2>
+    <p>Traducteur et dictionnaire pour la langue tchétchène (нохчийн мотт), construit uniquement à partir de sources vérifiables. Chaque traduction affiche sa source et son niveau de fiabilité :</p>
+    <p><span class="badge b-high">Dictionnaire</span> entrée issue d'un dictionnaire publié — fiable.<br>
+    <span class="badge b-mid">Manuel</span> expression tirée de méthodes de langue — fiable à l'usage.<br>
+    <span class="badge b-low">MT en ligne</span> traduction automatique — qualité limitée pour le tchétchène, à vérifier.</p>
+    <h3>Sources des données</h3>
+    <ul>
+      <li><b>Wiktionary anglais</b> (via kaikki.org, licence CC BY-SA) — 1 177 entrées tchétchènes avec traduction française.</li>
+      <li><b>Dictionnaire tchétchène-russe de A. G. Matsiev</b> et vocabulaire BaltoSlav, via le corpus ouvert <i>NM-development/nmd-ce-ru-171k-v0</i> (arXiv:2507.12672) — 13 704 paires CE↔RU. Ce dictionnaire sert aussi à corriger les mots russes laissés par la traduction automatique.</li>
+      <li><b>Sources web secondaires</b> — chechen.tchetchene.free.fr (vocabulaire FR-CE thématique), Waynakh Online, wiki LING073 : 1 156 paires supplémentaires, marquées de leur source.</li>
+      <li><b>Méthodes de langue</b> (LIMBA, Waynakh Online) pour les expressions courantes.</li>
+      <li>Grammaire : J. Nichols, fiche CNRS-LGIDF « Le tchétchène ».</li>
+    </ul>
+    <h3>Traduction de phrases</h3>
+    <p>Pour les phrases complètes, l'application interroge Google Translate (le tchétchène y est pris en charge depuis 2024) et complète par une analyse mot à mot du dictionnaire. Aucune traduction automatique n'est affichée sans avertissement.</p>
+    <p class="hint">Version 1.0 — juillet 2026. Fonctionne hors ligne pour le dictionnaire ; installable sur téléphone (PWA) quand servie par un serveur web (voir README).</p>
+  </div>
+</section>
+</main>
+
+<footer>Noxchiyn Mott <span class="dot">·</span> v1.0 <span class="dot">·</span> sources ouvertes, traductions vérifiables</footer>
+
+<script src="data/dict.js?v=4"></script>
+<script src="data/phrases.js?v=4"></script>
+<script src="app.js?v=4"></script>
+</body>
+</html>
