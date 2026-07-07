@@ -875,7 +875,12 @@ function applyLang(l){
 }
 (function(){
   const sel=$("ui-lang"); if(!sel) return;
-  let l="fr"; try{l=localStorage.getItem("nm_uilang")||"fr";}catch(e){}
+  let l=null; try{l=localStorage.getItem("nm_uilang");}catch(e){}
+  if(!l){ // premier passage : détecter la langue de l'appareil
+    const prefs=(navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language||"fr"])
+      .map(x=>String(x).toLowerCase().slice(0,2));
+    l=prefs.find(c=>["ce","fr","ru","en"].includes(c))||"en";
+  }
   sel.value=l;
   sel.addEventListener("change",()=>{ applyLang(sel.value);
     try{localStorage.setItem("nm_uilang",sel.value);}catch(e){} });
