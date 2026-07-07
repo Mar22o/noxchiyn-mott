@@ -1,11 +1,13 @@
 /* Noxchiyn Mott — style sobre, identité tchétchène (vert/blanc/rouge/or du drapeau) */
 :root{
+  color-scheme:light;
   --green:#0f5c33; --green-d:#0a4526; --red:#b3272d; --gold:#c9a227;
   --bg:#f7f6f2; --card:#ffffff; --ink:#22302a; --mut:#6b7a72; --line:#e2e0d8;
   --soft:#edf3ee; --header:#0f5c33; --shadow:rgba(0,0,0,.04);
 }
 /* thème sombre : vert profond, or patiné — pas un simple fond noir */
 body.dark{
+  color-scheme:dark;
   --green:#2f9e63; --green-d:#27824f; --red:#d05e57; --gold:#d4b04a;
   --bg:#101713; --card:#18211c; --ink:#e7ece8; --mut:#9ab0a4; --line:#27332c;
   --soft:#1f2b24; --header:#0c2f1d; --shadow:rgba(0,0,0,.45);
@@ -133,7 +135,9 @@ footer .dot{color:var(--gold)}
   /* onglets : une seule ligne, défilement horizontal fluide */
   nav#tabs{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
   nav#tabs::-webkit-scrollbar{display:none}
-  nav#tabs button{padding:9px 11px;font-size:.88rem;white-space:nowrap;flex:none}
+
+  /* largeur calée sur l'écran : un onglet dépasse toujours du bord -> on comprend qu'on peut faire défiler */
+  nav#tabs button{padding:9px 6px;font-size:.88rem;white-space:nowrap;flex:0 0 auto;min-width:30.5vw;text-align:center}
   /* contenu : marges réduites, cibles tactiles plus grandes */
   main{padding:14px 10px 30px}
   .card{padding:12px}

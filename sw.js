@@ -1,5 +1,5 @@
 // Service worker : cache local pour fonctionner hors ligne (dictionnaire inclus)
-const CACHE = "noxchiyn-mott-v19";
+const CACHE = "noxchiyn-mott-v21";
 const FILES = ["./","./index.html","./style.css","./app.js",
   "./data/dict.js","./data/phrases.js","./manifest.webmanifest","./icons/icon.svg"];
 self.addEventListener("install", e => {

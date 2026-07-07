@@ -942,6 +942,8 @@ function applyLang(l){
   function set(v){ dark=v;
     document.body.classList.toggle("dark",v);
     b.textContent=v?"☀️":"🌙";
+    const tc=document.querySelector('meta[name="theme-color"]');
+    if(tc) tc.setAttribute("content",v?"#0c2f1d":"#0f5c33");
     try{localStorage.setItem("nm_theme",v?"dark":"light");}catch(e){}
   }
   set(dark);
@@ -963,6 +965,20 @@ function applyLang(l){
     else alert(T("installHow"));
   });
   window.addEventListener("appinstalled",()=>{b.style.display="none";});
+})();
+
+/* ---------- indicateur de défilement des onglets (mobile) ---------- */
+(function(){
+  const nav=document.getElementById("tabs"), wrap=nav&&nav.parentElement;
+  if(!nav||!wrap||!wrap.classList.contains("tabs-wrap")) return;
+  function upd(){
+    const end=nav.scrollLeft+nav.clientWidth>=nav.scrollWidth-8;
+    const scrollable=nav.scrollWidth>nav.clientWidth+8;
+    wrap.classList.toggle("at-end",end||!scrollable);
+  }
+  nav.addEventListener("scroll",upd,{passive:true});
+  window.addEventListener("resize",upd);
+  setTimeout(upd,0); setTimeout(upd,600);
 })();
 
 /* ---------- PWA ---------- */
