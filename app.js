@@ -330,7 +330,7 @@ function phraseMatches(q,src){
   // sinon : correspondance par mots porteurs de sens ("comment tu t'appelles" ~ "comment t'appelles-tu ?")
   if(!res.length&&src!=="ce"){
     const cw=nq.split(/[^a-zà-ÿ]+/).filter(w=>w.length>2&&!STOP_FR.has(w));
-    if(cw.length) res=NM_PHRASES.filter(p=>{const pf=normFr(p.fr);return cw.every(w=>pf.includes(w));});
+    if(cw.length) res=NM_PHRASES.filter(p=>{const pf=normFr(p.fr+" "+(p.k||""));return cw.every(w=>pf.includes(w));});
   }
   return res.slice(0,10);
 }
@@ -479,13 +479,42 @@ $("dico-q").addEventListener("input",()=>{
 });
 
 /* ---------- expressions ---------- */
+function phraseRow(p){
+  return `<div class="entry"><span class="ce">${esc(p.ce)}</span><span class="lat">${esc(translit(p.ce))}</span><span class="tr">${esc(p.fr)}</span><span class="badge b-mid">${T("badgeManual")}</span></div>`;
+}
 function renderPhrases(){
   const cats=[...new Set(NM_PHRASES.map(p=>p.cat))];
-  $("phrases-out").innerHTML=cats.map(c=>
-    `<div class="card"><h2>${esc(T("cat:"+c))}</h2>`+
-    NM_PHRASES.filter(p=>p.cat===c).map(p=>
-      `<div class="entry"><span class="ce">${esc(p.ce)}</span><span class="lat">${esc(translit(p.ce))}</span><span class="tr">${esc(p.fr)}</span><span class="badge b-mid">${T("badgeManual")}</span></div>`).join("")+`</div>`).join("");
+  $("phrases-out").innerHTML=cats.map((c,i)=>
+    `<details class="pcat"${i===0?" open":""}><summary>${esc(T("cat:"+c))}<span class="pcount">${NM_PHRASES.filter(p=>p.cat===c).length}</span></summary>`+
+    NM_PHRASES.filter(p=>p.cat===c).map(phraseRow).join("")+`</details>`).join("");
 }
+// moteur « décrivez la situation » : correspondance par mots-clés multilingues
+function situationSearch(v){
+  const nv=normFr(v);
+  const words=nv.split(/[^a-zà-ÿа-яёӏ-]+/i).filter(w=>w.length>2&&!STOP_FR.has(w)&&!STOP_EN.has(w)&&!STOP_RU.has(w));
+  if(!words.length) return [];
+  const scored=[];
+  for(const p of NM_PHRASES){
+    const hay=normFr([p.ce,p.fr,p.k||"",p.ke||"",p.kr||"",p.cat].join(" "));
+    let s=0; for(const w of words){ if(hay.includes(w)) s++; }
+    if(s>0) scored.push([s,p]);
+  }
+  scored.sort((a,b)=>b[0]-a[0]);
+  const best=scored[0]?scored[0][0]:0;
+  return scored.filter(x=>x[0]>=Math.max(1,best-1)).slice(0,6).map(x=>x[1]);
+}
+(function(){
+  const q=document.getElementById("phr-q"); if(!q) return;
+  let t=null;
+  q.addEventListener("input",()=>{clearTimeout(t);t=setTimeout(()=>{
+    const res=document.getElementById("phr-res"), v=q.value.trim();
+    if(v.length<3){res.innerHTML="";return;}
+    const hits=situationSearch(v);
+    res.innerHTML=hits.length
+      ?`<div class="card"><h2>${T("phrFound")}</h2>`+hits.map(phraseRow).join("")+`</div>`
+      :`<div class="empty">${T("noRes2")}</div>`;
+  },250);});
+})();
 
 /* ---------- nombres (système vigésimal) ---------- */
 const NUM={0:"ноль",1:"цхьаъ",2:"шиъ",3:"кхоъ",4:"диъ",5:"пхиъ",6:"ялх",7:"ворхӏ",8:"бархӏ",9:"исс",10:"итт",
@@ -764,7 +793,7 @@ const I18N={
   impReading:"Lecture de",impPrep:"Préparation de l'image…",
   impDone:"Texte extrait ({n} caractères). Relisez, corrigez si besoin, puis traduisez.",
   impNone:"Aucun texte détecté. S'il s'agit d'un scan, cochez « forcer l'OCR ».",err:"Erreur : ",ocrModel:"Téléchargement du modèle OCR…",
-  "cat:Salutations":"Salutations","cat:Politesse":"Politesse","cat:Base":"Base","cat:Conversation":"Conversation","cat:Langue":"Langue","cat:Sentiments":"Sentiments",
+  "cat:Salutations":"Salutations","cat:Vœux et bénédictions":"Vœux et bénédictions","cat:Hospitalité":"Hospitalité","cat:Événements de la vie":"Événements de la vie","cat:Religion et fêtes":"Religion et fêtes","cat:Respect des aînés":"Respect des aînés","cat:Voyage":"Voyage",phrQ:"Décrivez la situation… ex : quelqu\u2019un a acheté un nouvel habit",phrFound:"Expressions pour cette situation","cat:Politesse":"Politesse","cat:Base":"Base","cat:Conversation":"Conversation","cat:Langue":"Langue","cat:Sentiments":"Sentiments",
   numN:"Nombre",numCE:"Tchétchène",numTL:"Translit.",numST:"Structure",
   install:"Installer",copy:"Copier",copied:"Copié !",installHow:"Pour installer l\u2019application :\niPhone/iPad : Safari \u2192 bouton Partager \u2192 \u00ab Sur l\u2019\u00e9cran d\u2019accueil \u00bb.\nAndroid/PC : menu du navigateur \u2192 \u00ab Installer l\u2019application \u00bb.",
   aboutHtml:`<h2>Noxchiyn Mott — Нохчийн мотт</h2>
@@ -795,7 +824,7 @@ const I18N={
   impReading:"Чтение",impPrep:"Подготовка изображения…",
   impDone:"Текст извлечён ({n} знаков). Проверьте и переводите.",
   impNone:"Текст не обнаружен. Если это скан, включите «принудительный OCR».",err:"Ошибка: ",ocrModel:"Загрузка модели OCR…",
-  "cat:Salutations":"Приветствия","cat:Politesse":"Вежливость","cat:Base":"Основное","cat:Conversation":"Разговор","cat:Langue":"Язык","cat:Sentiments":"Чувства",
+  "cat:Salutations":"Приветствия","cat:Vœux et bénédictions":"Пожелания и благословения","cat:Hospitalité":"Гостеприимство","cat:Événements de la vie":"События жизни","cat:Religion et fêtes":"Религия и праздники","cat:Respect des aînés":"Уважение к старшим","cat:Voyage":"Дорога",phrQ:"Опишите ситуацию… напр.: человек купил обновку",phrFound:"Выражения для этой ситуации","cat:Politesse":"Вежливость","cat:Base":"Основное","cat:Conversation":"Разговор","cat:Langue":"Язык","cat:Sentiments":"Чувства",
   numN:"Число",numCE:"Чеченский",numTL:"Транслит.",numST:"Структура",
   install:"Установить",copy:"Копировать",copied:"Скопировано!",installHow:"Установка приложения:\niPhone/iPad: Safari \u2192 Поделиться \u2192 \u00abНа экран \u00abДомой\u00bb\u00bb.\nAndroid/ПК: меню браузера \u2192 \u00abУстановить приложение\u00bb.",
   aboutHtml:`<h2>Noxchiyn Mott — Нохчийн мотт</h2>
@@ -826,7 +855,7 @@ const I18N={
   impReading:"Reading",impPrep:"Preparing image…",
   impDone:"Text extracted ({n} chars). Review, then translate.",
   impNone:"No text detected. If it is a scan, enable “force OCR”.",err:"Error: ",ocrModel:"Downloading OCR model…",
-  "cat:Salutations":"Greetings","cat:Politesse":"Politeness","cat:Base":"Basics","cat:Conversation":"Conversation","cat:Langue":"Language","cat:Sentiments":"Feelings",
+  "cat:Salutations":"Greetings","cat:Vœux et bénédictions":"Wishes & blessings","cat:Hospitalité":"Hospitality","cat:Événements de la vie":"Life events","cat:Religion et fêtes":"Religion & holidays","cat:Respect des aînés":"Respect for elders","cat:Voyage":"Travel",phrQ:"Describe the situation… e.g. someone bought new clothes",phrFound:"Phrases for this situation","cat:Politesse":"Politeness","cat:Base":"Basics","cat:Conversation":"Conversation","cat:Langue":"Language","cat:Sentiments":"Feelings",
   numN:"Number",numCE:"Chechen",numTL:"Translit.",numST:"Structure",
   install:"Install",copy:"Copy",copied:"Copied!",installHow:"To install the app:\niPhone/iPad: Safari \u2192 Share \u2192 \u201cAdd to Home Screen\u201d.\nAndroid/PC: browser menu \u2192 \u201cInstall app\u201d.",
   aboutHtml:`<h2>Noxchiyn Mott — Нохчийн мотт</h2>
@@ -840,7 +869,7 @@ const I18N={
   phNum:"Терахь язде (0–999 999)",impTrad:"ХӀара йоза гочде →",sub:"Нохчийн мотт · нохчийн гочдархо",
   lnFr:"Французийн",lnCe:"Нохчийн",lnRu:"Оьрсийн",lnEn:"Ингалсан",
   docLang:"Документан мотт:",cardDict:"Дошам",cardExpr:"Аларш",badgeDict:"дошам",
-  "cat:Salutations":"Маршалла","cat:Langue":"Мотт",numCE:"Нохчийн",numN:"Терахь"}
+  "cat:Salutations":"Маршалла","cat:Hospitalité":"Хьошалла","cat:Voyage":"Некъ","cat:Langue":"Мотт",numCE:"Нохчийн",numN:"Терахь"}
 };
 function T(k){
   const l=I18N[CURLANG]||{};
@@ -859,6 +888,7 @@ function applyLang(l){
   $("trad-in").placeholder=T("phTrad");
   $("dico-q").placeholder=T("phDico");
   $("num-in").placeholder=T("phNum");
+  const pq=$("phr-q"); if(pq) pq.placeholder=T("phrQ");
   const it=$("imp-trad"); if(it) it.textContent=T("impTrad");
   const ins=$("lbl-install"); if(ins) ins.textContent=T("install");
   // noms des langues dans les sélecteurs

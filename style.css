@@ -137,3 +137,13 @@ body.dark input,body.dark textarea,body.dark select{color-scheme:dark}
 /* bouton copier */
 .copy-btn{margin-top:8px;background:var(--soft);border:1px solid var(--line);border-radius:8px;padding:5px 12px;font:inherit;font-size:.85rem;cursor:pointer;color:var(--ink)}
 .copy-btn:hover{border-color:var(--green)}
+
+/* catégories rabattables (expressions) */
+.pcat{background:var(--card);border:1px solid var(--line);border-radius:12px;margin:8px 0;padding:0 14px;box-shadow:0 1px 2px var(--shadow)}
+.pcat summary{cursor:pointer;padding:12px 0;font-weight:600;color:var(--green);list-style:none;display:flex;align-items:center;gap:10px}
+.pcat summary::-webkit-details-marker{display:none}
+.pcat summary::before{content:"\25B8";transition:transform .15s;color:var(--gold)}
+.pcat[open] summary::before{transform:rotate(90deg)}
+.pcount{background:var(--soft);color:var(--mut);border-radius:14px;padding:1px 9px;font-size:.75rem;font-weight:400;margin-left:auto}
+.pcat .entry:last-of-type{margin-bottom:10px}
+#phr-q{margin-bottom:8px}
