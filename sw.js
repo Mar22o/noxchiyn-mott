@@ -1,5 +1,5 @@
 // Service worker : cache local pour fonctionner hors ligne (dictionnaire inclus)
-const CACHE = "noxchiyn-mott-v24";
+const CACHE = "noxchiyn-mott-v27";
 const FILES = ["./","./index.html","./style.css","./app.js",
   "./data/dict.js","./data/phrases.js","./manifest.webmanifest","./icons/icon.svg"];
 self.addEventListener("install", e => {
@@ -19,7 +19,7 @@ self.addEventListener("fetch", e => {
     // polices et bibliothèques (PDF, Word, OCR) : cache après premier chargement
     e.respondWith(caches.open(CACHE).then(async c => {
       const m = await c.match(e.request);
-      const f = fetch(e.request).then(r => { c.put(e.request, r.clone()); return r; }).catch(() => m);
+      const f = fetch(e.request).then(r => { if (r.ok || r.type === "opaque") c.put(e.request, r.clone()); return r; }).catch(() => m);
       return m || f;
     }));
     return;

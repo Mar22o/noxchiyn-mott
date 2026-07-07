@@ -175,3 +175,17 @@ body.dark input,body.dark textarea,body.dark select{color-scheme:dark}
 .pcount{background:var(--soft);color:var(--mut);border-radius:14px;padding:1px 9px;font-size:.75rem;font-weight:400;margin-left:auto}
 .pcat .entry:last-of-type{margin-bottom:10px}
 #phr-q{margin-bottom:8px}
+
+/* historique */
+.row{display:flex;gap:8px;align-items:center}
+.row input{flex:1}
+.hist-btn{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 12px;font:inherit;font-size:1rem;cursor:pointer;color:var(--ink)}
+.hist-btn:hover{border-color:var(--green);background:var(--soft)}
+.hist-btn.on{background:var(--gold);border-color:var(--gold);color:#22302a}
+.hist-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.hist-head h2{margin:0}
+.hist-head .copy-btn{margin:0}
+.hist-item{display:flex;justify-content:space-between;gap:10px;padding:7px 6px;border-bottom:1px dashed var(--line);cursor:pointer;border-radius:6px}
+.hist-item:hover{background:var(--soft)}
+.hist-item:last-child{border-bottom:none}
+.hist-item .hq{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

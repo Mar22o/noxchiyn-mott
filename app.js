@@ -2,6 +2,10 @@
    Données : window.NM_DATA (dict.js), window.NM_PHRASES (phrases.js) */
 "use strict";
 
+/* ---------- protections ---------- */
+// anti-clickjacking : si le site est chargé dans une iframe d'un autre domaine, on s'en échappe
+try{ if(window.top!==window.self) window.top.location=window.self.location; }catch(e){}
+
 /* ---------- utilitaires ---------- */
 // Normalisation : minuscules + toutes les variantes de palotchka -> ӏ
 function norm(s){
@@ -96,7 +100,7 @@ function entryHtml(d,dst){
   if(d.v) tr.push('<span class="lat">variante de '+esc(d.v)+"</span>");
   return `<div class="entry"><span class="ce">${esc(d.ce)}</span>
     <span class="lat">${esc(translit(d.ce))}</span>
-    ${d.pos?`<span class="pos">${d.pos}</span>`:""}
+    ${d.pos?`<span class="pos">${esc(d.pos)}</span>`:""}
     <span class="tr">${tr.join(" · ")}</span>
     <span class="badge ${d.cls}" title="Source : ${esc(d.src)}">${esc(d.src)}</span></div>`;
 }
@@ -125,7 +129,7 @@ function renderGrouped(refs,dst){
       if(d.en&&(dst==="en"||!d.fr)) tr.push(esc(d.en));
       if(d.tr) tr.push("tr : "+esc(d.tr));
       if(d.v) tr.push(`<span class="lat">${T("variantOf")} ${esc(d.v)}</span>`);
-      html+=`<div class="sense">${d.pos?`<span class="pos">${d.pos}</span> `:""}${tr.join(" · ")} <span class="badge ${d.cls}" title="Source">${esc(d.src)}</span></div>`;
+      html+=`<div class="sense">${d.pos?`<span class="pos">${esc(d.pos)}</span> `:""}${tr.join(" · ")} <span class="badge ${d.cls}" title="Source">${esc(d.src)}</span></div>`;
     }
     html+=`</div></div>`;
   }
@@ -156,21 +160,19 @@ function ruTokenMap(){
 // équivalent tchétchène d'un mot russe (dictionnaire Matsiev) ; null si inconnu
 function ruLookup(w){
   if(RU_MINI[w]) return {c:RU_MINI[w],s:"dico"};
-  const M=ruTokenMap();
-  const vars=[w]; if(w.length>4)vars.push(w.slice(0,-1)); if(w.length>5)vars.push(w.slice(0,-2));
-  for(const v of vars){
-    const arr=M.get(v); if(!arr) continue;
-    let best=null,bs=2;
-    for(const i of arr){ const e=R[i], r=e.r.toLowerCase();
-      let s=0;
-      if(r===w) s+=5; else if(r===v) s+=4;
-      const cw=e.c.split(/\s+/).length;
-      s+=(cw===1?3:cw===2?1:0);
-      if(s>bs){bs=s;best=e;}
-    }
-    if(best) return best;
+  // correspondance EXACTE uniquement : couper la fin d'un mot inconnu pour chercher
+  // une racine russe créait des faux positifs sur des mots tchétchènes conjugués
+  // (ex. карийча « si tu trouves » -> confondu avec le russe карий « marron »)
+  const arr=ruTokenMap().get(w); if(!arr) return null;
+  let best=null,bs=2;
+  for(const i of arr){ const e=R[i], r=e.r.toLowerCase();
+    let s=0;
+    if(r===w) s+=5;                      // l'entrée russe est exactement ce mot
+    const cw=e.c.split(/\s+/).length;
+    s+=(cw===1?3:cw===2?1:0);            // côté tchétchène court = plus sûr
+    if(s>bs){bs=s;best=e;}
   }
-  return null;
+  return best;
 }
 // analyse une sortie MT vers le tchétchène : mots russes non traduits -> substitution.
 // Règle : si le mot figure dans le dictionnaire tchétchène (emprunts au russe inclus), on le garde ;
@@ -203,10 +205,10 @@ async function fixLeaksOnline(ana){
     if(CE_MARKS.test(w)) continue;                  // contient une lettre tchétchène : pas du russe
     if(idxCe.has(norm(w))) continue;
     if(ruLookup(w.toLowerCase())) continue; // déjà substitué par le dictionnaire
-    // ne retraduire que les mots CONFIRMÉS russes par notre corpus (sinon on risque
-    // de « traduire » un mot tchétchène rare, cf. вац -> ват)
-    const lw=w.toLowerCase(), M=ruTokenMap();
-    if(!M.has(lw)&&!M.has(lw.slice(0,-1))&&!M.has(lw.slice(0,-2))) continue;
+    // ne retraduire que les mots EXACTEMENT confirmés russes par notre corpus
+    // (jamais par racine tronquée : faux positifs sur les mots tchétchènes conjugués)
+    const lw=w.toLowerCase();
+    if(!ruTokenMap().has(lw)) continue;
     try{
       const t=await gtx("ru","ce",w.toLowerCase());
       // n'accepter la substitution QUE si le résultat est un mot vérifié de notre dictionnaire
@@ -346,6 +348,7 @@ async function doTranslate(){
     src="ce"; $("src-lang").value=src;
   }
   if(dst===src){ dst=(src==="ce")?"fr":"ce"; $("dst-lang").value=dst; }
+  if(q) histAdd("nm_h_trad",{q:q.slice(0,120),s:src,d:dst});
   const out=$("trad-out"); out.innerHTML="";
   if(!q) return;
   const words=q.split(/\s+/);
@@ -475,13 +478,17 @@ async function doTranslate(){
       const gl=`https://translate.google.com/?sl=${src}&tl=${dst}&text=${encodeURIComponent(q)}`;
       box.innerHTML=`<h2>${T("cardMT")}</h2>
         <p class="hint">${T("mtOffline")}
-        <a href="${gl}" target="_blank" rel="noopener">${T("mtOpen")}</a></p>`;
+        <a href="${gl}" target="_blank" rel="noopener noreferrer">${T("mtOpen")}</a></p>`;
     }
   }
 }
 
 /* ---------- dictionnaire ---------- */
 /* stats retirées */
+$("dico-q").addEventListener("change",()=>{
+  const v=$("dico-q").value.trim();
+  if(v.length>=2) histAdd("nm_h_dico",{q:v.slice(0,80)});
+});
 let dicoTimer=null;
 $("dico-q").addEventListener("input",()=>{
   clearTimeout(dicoTimer);
@@ -676,7 +683,7 @@ function renderGram(){
 function loadScript(srcs){
   srcs=Array.isArray(srcs)?srcs:[srcs];
   return srcs.reduce((p,s)=>p.catch(()=>new Promise((res,rej)=>{
-    const el=document.createElement("script");el.src=s;el.onload=res;el.onerror=rej;
+    const el=document.createElement("script");el.src=s;el.crossOrigin="anonymous";el.referrerPolicy="no-referrer";el.onload=res;el.onerror=rej;
     document.head.appendChild(el);
   })),Promise.reject()).then(()=>true,()=>false);
 }
@@ -819,7 +826,7 @@ const I18N={
   impNone:"Aucun texte détecté. S'il s'agit d'un scan, cochez « forcer l'OCR ».",err:"Erreur : ",ocrModel:"Téléchargement du modèle OCR…",
   "cat:Salutations":"Salutations","cat:Vœux et bénédictions":"Vœux et bénédictions","cat:Hospitalité":"Hospitalité","cat:Événements de la vie":"Événements de la vie","cat:Religion et fêtes":"Religion et fêtes","cat:Respect des aînés":"Respect des aînés","cat:Voyage":"Voyage",phrQ:"Décrivez la situation… ex : quelqu\u2019un a acheté un nouvel habit",phrFound:"Expressions pour cette situation","cat:Politesse":"Politesse","cat:Base":"Base","cat:Conversation":"Conversation","cat:Langue":"Langue","cat:Sentiments":"Sentiments",
   numN:"Nombre",numCE:"Tchétchène",numTL:"Translit.",numST:"Structure",
-  install:"Installer",copy:"Copier",copied:"Copié !",adapted1p:"adapté à la 1re personne (« je ») — ву pour un homme, ю pour une femme",badgeRule:"règle",installHow:"Pour installer l\u2019application :\niPhone/iPad : Safari \u2192 bouton Partager \u2192 \u00ab Sur l\u2019\u00e9cran d\u2019accueil \u00bb.\nAndroid/PC : menu du navigateur \u2192 \u00ab Installer l\u2019application \u00bb.",
+  install:"Installer",copy:"Copier",copied:"Copié !",adapted1p:"adapté à la 1re personne (« je ») — ву pour un homme, ю pour une femme",badgeRule:"règle",histT:"Historique",histEmpty:"Aucun historique pour l\u2019instant.",histClear:"Effacer",installHow:"Pour installer l\u2019application :\niPhone/iPad : Safari \u2192 bouton Partager \u2192 \u00ab Sur l\u2019\u00e9cran d\u2019accueil \u00bb.\nAndroid/PC : menu du navigateur \u2192 \u00ab Installer l\u2019application \u00bb.",
   aboutHtml:`<h2>Noxchiyn Mott — Нохчийн мотт</h2>
    <p>Dictionnaire et traducteur pour la langue tchétchène, construit à partir de sources publiées et vérifiables. Chaque résultat affiche sa source :</p>
    <p><span class="badge b-high">dictionnaire</span> dictionnaires publiés (Wiktionary, Matsiev…) · <span class="badge b-mid">Manuel</span> méthodes de langue · <span class="badge b-low">MT en ligne</span> traduction automatique, à vérifier.</p>
@@ -850,7 +857,7 @@ const I18N={
   impNone:"Текст не обнаружен. Если это скан, включите «принудительный OCR».",err:"Ошибка: ",ocrModel:"Загрузка модели OCR…",
   "cat:Salutations":"Приветствия","cat:Vœux et bénédictions":"Пожелания и благословения","cat:Hospitalité":"Гостеприимство","cat:Événements de la vie":"События жизни","cat:Religion et fêtes":"Религия и праздники","cat:Respect des aînés":"Уважение к старшим","cat:Voyage":"Дорога",phrQ:"Опишите ситуацию… напр.: человек купил обновку",phrFound:"Выражения для этой ситуации","cat:Politesse":"Вежливость","cat:Base":"Основное","cat:Conversation":"Разговор","cat:Langue":"Язык","cat:Sentiments":"Чувства",
   numN:"Число",numCE:"Чеченский",numTL:"Транслит.",numST:"Структура",
-  install:"Установить",copy:"Копировать",copied:"Скопировано!",adapted1p:"адаптировано к 1-му лицу («я») — ву для мужчины, ю для женщины",badgeRule:"правило",installHow:"Установка приложения:\niPhone/iPad: Safari \u2192 Поделиться \u2192 \u00abНа экран \u00abДомой\u00bb\u00bb.\nAndroid/ПК: меню браузера \u2192 \u00abУстановить приложение\u00bb.",
+  install:"Установить",copy:"Копировать",copied:"Скопировано!",adapted1p:"адаптировано к 1-му лицу («я») — ву для мужчины, ю для женщины",badgeRule:"правило",histT:"История",histEmpty:"История пока пуста.",histClear:"Очистить",installHow:"Установка приложения:\niPhone/iPad: Safari \u2192 Поделиться \u2192 \u00abНа экран \u00abДомой\u00bb\u00bb.\nAndroid/ПК: меню браузера \u2192 \u00abУстановить приложение\u00bb.",
   aboutHtml:`<h2>Noxchiyn Mott — Нохчийн мотт</h2>
    <p>Словарь и переводчик чеченского языка, построенный на опубликованных и проверяемых источниках. Каждый результат показывает свой источник:</p>
    <p><span class="badge b-high">словарь</span> изданные словари (Wiktionary, Мациев…) · <span class="badge b-mid">Учебник</span> учебные пособия · <span class="badge b-low">онлайн-МП</span> машинный перевод, требует проверки.</p>
@@ -881,7 +888,7 @@ const I18N={
   impNone:"No text detected. If it is a scan, enable “force OCR”.",err:"Error: ",ocrModel:"Downloading OCR model…",
   "cat:Salutations":"Greetings","cat:Vœux et bénédictions":"Wishes & blessings","cat:Hospitalité":"Hospitality","cat:Événements de la vie":"Life events","cat:Religion et fêtes":"Religion & holidays","cat:Respect des aînés":"Respect for elders","cat:Voyage":"Travel",phrQ:"Describe the situation… e.g. someone bought new clothes",phrFound:"Phrases for this situation","cat:Politesse":"Politeness","cat:Base":"Basics","cat:Conversation":"Conversation","cat:Langue":"Language","cat:Sentiments":"Feelings",
   numN:"Number",numCE:"Chechen",numTL:"Translit.",numST:"Structure",
-  install:"Install",copy:"Copy",copied:"Copied!",adapted1p:"adapted to 1st person (\u201cI\u201d) \u2014 ву for a man, ю for a woman",badgeRule:"rule",installHow:"To install the app:\niPhone/iPad: Safari \u2192 Share \u2192 \u201cAdd to Home Screen\u201d.\nAndroid/PC: browser menu \u2192 \u201cInstall app\u201d.",
+  install:"Install",copy:"Copy",copied:"Copied!",adapted1p:"adapted to 1st person (\u201cI\u201d) \u2014 ву for a man, ю for a woman",badgeRule:"rule",histT:"History",histEmpty:"No history yet.",histClear:"Clear",installHow:"To install the app:\niPhone/iPad: Safari \u2192 Share \u2192 \u201cAdd to Home Screen\u201d.\nAndroid/PC: browser menu \u2192 \u201cInstall app\u201d.",
   aboutHtml:`<h2>Noxchiyn Mott — Нохчийн мотт</h2>
    <p>A dictionary and translator for the Chechen language, built from published, verifiable sources. Every result shows its source:</p>
    <p><span class="badge b-high">dictionary</span> published dictionaries (Wiktionary, Matsiev…) · <span class="badge b-mid">Textbook</span> language courses · <span class="badge b-low">online MT</span> machine translation, to be verified.</p>
@@ -942,6 +949,37 @@ function applyLang(l){
   window.addEventListener("DOMContentLoaded",()=>applyLang(sel.value));
   setTimeout(()=>applyLang(sel.value),0);
 })();
+
+/* ---------- historique des traductions / recherches ---------- */
+function histGet(k){try{return JSON.parse(localStorage.getItem(k)||"[]");}catch(e){return [];}}
+function histAdd(k,it){try{
+  let h=histGet(k).filter(x=>!(x.q===it.q&&x.s===it.s&&x.d===it.d));
+  h.unshift(it); if(h.length>40) h.length=40;
+  localStorage.setItem(k,JSON.stringify(h));
+}catch(e){}}
+function histRender(key,panel,onPick){
+  const h=histGet(key);
+  panel.innerHTML=`<div class="card"><div class="hist-head"><h2>${T("histT")}</h2>
+    <button class="copy-btn hist-clear">🗑 ${T("histClear")}</button></div>`+
+    (h.length?h.map((x,i)=>`<div class="hist-item" data-i="${i}"><span class="hq">${esc(x.q)}</span>${x.s?`<span class="lat">${esc(x.s)}→${esc(x.d)}</span>`:""}</div>`).join("")
+             :`<div class="empty">${T("histEmpty")}</div>`)+`</div>`;
+  panel.querySelector(".hist-clear").addEventListener("click",()=>{ 
+    try{localStorage.removeItem(key);}catch(e){} histRender(key,panel,onPick); });
+  panel.querySelectorAll(".hist-item").forEach(el=>el.addEventListener("click",()=>{ 
+    panel.hidden=true; onPick(h[+el.dataset.i]); }));
+}
+function histWire(btnId,panelId,key,onPick){
+  const b=$(btnId), p=$(panelId); if(!b||!p) return;
+  b.addEventListener("click",()=>{ if(p.hidden){histRender(key,p,onPick);p.hidden=false;} else p.hidden=true; });
+}
+histWire("btn-hist-t","hist-t","nm_h_trad",it=>{
+  $("trad-in").value=it.q;
+  if(it.s)$("src-lang").value=it.s; if(it.d)$("dst-lang").value=it.d;
+  doTranslate();
+});
+histWire("btn-hist-d","hist-d","nm_h_dico",it=>{
+  const q=$("dico-q"); q.value=it.q; q.dispatchEvent(new Event("input"));
+});
 
 /* ---------- affichage manuscrit (cursive attachée) ---------- */
 (function(){
@@ -1009,7 +1047,7 @@ function applyLang(l){
 })();
 
 /* ---------- version visible (diagnostic cache) ---------- */
-(function(){const v=document.getElementById("ver");if(v)v.textContent="· v24";})();
+(function(){const v=document.getElementById("ver");if(v)v.textContent="· v27";})();
 
 /* ---------- PWA ---------- */
 if("serviceWorker" in navigator && location.protocol.startsWith("http")){
