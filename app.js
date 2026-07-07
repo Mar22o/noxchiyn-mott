@@ -759,6 +759,76 @@ async function ocrImage(src,lang){
   lastOcrConf=Math.round(best.data.confidence);
   return best.data.text;
 }
+/* ---------- OCR manuscrit : Google Cloud Vision (le meilleur pour la cursive cyrillique) ---------- */
+async function visionOcr(file,key){
+  const b64=await new Promise((res,rej)=>{const r=new FileReader();
+    r.onload=()=>res(String(r.result).split(",")[1]); r.onerror=rej; r.readAsDataURL(file);});
+  const body={requests:[{image:{content:b64},
+    features:[{type:"DOCUMENT_TEXT_DETECTION"}],imageContext:{languageHints:["ru"]}}]};
+  const resp=await fetch("https://vision.googleapis.com/v1/images:annotate?key="+encodeURIComponent(key),
+    {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+  const j=await resp.json();
+  const r0=(j.responses&&j.responses[0])||{};
+  if(j.error) throw new Error(j.error.message||"Vision");
+  if(r0.error) throw new Error(r0.error.message||"Vision");
+  return (r0.fullTextAnnotation&&r0.fullTextAnnotation.text)||"";
+}
+/* ---------- assistance dictionnaire : corrige les mots à 1 lettre près (candidat unique) ---------- */
+let CE_SET=null,RU_SET=null,DEL_IDX=null;
+function buildLexSets(){
+  if(CE_SET) return;
+  CE_SET=new Set(); RU_SET=new Set();
+  const add=(s,set)=>{for(const t of String(s||"").toLowerCase().replace(/ё/g,"е").split(/[^а-яӏ-]+/)) if(t.length>2) set.add(t);};
+  W.forEach(e=>add(e.c,CE_SET));
+  R.forEach(e=>{add(e.c,CE_SET);add(e.r,RU_SET);});
+}
+function buildDelIdx(){
+  if(DEL_IDX) return;
+  buildLexSets(); DEL_IDX=new Map();
+  for(const t of CE_SET){
+    if(t.length<4||t.length>12) continue;
+    for(let i=0;i<t.length;i++){
+      const k=t.slice(0,i)+t.slice(i+1);
+      const arr=DEL_IDX.get(k);
+      if(arr){ if(arr.length<4) arr.push(t); } else DEL_IDX.set(k,[t]);
+    }
+  }
+}
+let lastFixes=null;
+function ceAssist(text){
+  buildDelIdx();
+  const fixes=[];
+  const parts=text.split(/([^а-яёА-ЯЁӏӀ-]+)/);
+  for(let i=0;i<parts.length;i++){
+    const w=parts[i];
+    if(!/[а-яё]/i.test(w)||w.length<4||w.length>12) continue;
+    const lw=norm(w);
+    if(CE_SET.has(lw)||RU_SET.has(lw)) continue;
+    const cands=new Set();
+    (DEL_IDX.get(lw)||[]).forEach(t=>cands.add(t));               // il manque une lettre
+    for(let k=0;k<lw.length;k++){
+      const d=lw.slice(0,k)+lw.slice(k+1);
+      if(CE_SET.has(d)) cands.add(d);                              // une lettre en trop
+      (DEL_IDX.get(d)||[]).forEach(t=>{ if(t.length===lw.length) cands.add(t); }); // une lettre fausse
+    }
+    cands.delete(lw);
+    if(cands.size===1){ const c=[...cands][0]; fixes.push(w+"\u2192"+c); parts[i]=c; }
+  }
+  lastFixes=fixes;
+  return parts.join("");
+}
+/* ---------- détection de la langue du document ---------- */
+function guessDocLang(t){
+  buildLexSets();
+  const cyr=(t.toLowerCase().replace(/ё/g,"е").match(/[а-яӏ-]{3,}/g)||[]).slice(0,300);
+  if(cyr.length>=5){
+    let ce=0,ru=0;
+    for(const w of cyr){ if(CE_SET.has(w))ce++; if(RU_SET.has(w))ru++; }
+    return ce>=ru?"ce":"ru";
+  }
+  return (t.match(/[a-zà-ÿ]{3,}/gi)||[]).length>=5?"fr":null;
+}
+
 async function extractFile(file){
   const ext=(file.name.split(".").pop()||"").toLowerCase();
   const lang=$("imp-lang").value;
@@ -796,13 +866,24 @@ async function extractFile(file){
     }
   }
   else if(["png","jpg","jpeg","webp","bmp","gif"].includes(ext)){
-    impStatus(T("impPrep"));
-    text=await ocrImage(file,ocrLang);
+    if($("imp-hand")&&$("imp-hand").checked){
+      const key=($("vis-key")&&$("vis-key").value.trim())||"";
+      if(!key) throw new Error(T("visNoKey"));
+      impStatus("OCR cloud…");
+      text=await visionOcr(file,key);
+    }else{
+      impStatus(T("impPrep"));
+      text=await ocrImage(file,ocrLang);
+    }
   }
   else if(ext==="doc"){ throw new Error("Format .doc ancien non pris en charge : enregistrez le fichier en .docx"); }
   else{ throw new Error("Format non pris en charge : "+ext); }
   text=text.replace(/[ \t]+/g," ").replace(/\n{3,}/g,"\n\n").trim();
-  if(lang==="ce") text=cleanCe(text);
+  lastFixes=null;
+  const gl=guessDocLang(text);
+  if(gl&&$("imp-lang").value!==gl){ $("imp-lang").value=gl; }
+  const effLang=$("imp-lang").value;
+  if(effLang==="ce"){ text=cleanCe(text); text=ceAssist(text); }
   return text;
 }
 async function handleFile(file){
@@ -819,6 +900,7 @@ async function handleFile(file){
     $("imp-text").value=t;
     let msg=t?T("impDone").replace("{n}",t.length):T("impNone");
     if(lastOcrConf!=null){ msg+=" · OCR "+lastOcrConf+" %"; if(lastOcrConf<60) msg+=" — "+T("ocrLow"); }
+    if(lastFixes&&lastFixes.length) msg+=" · "+T("fixedN").replace("{n}",lastFixes.length)+" ("+lastFixes.slice(0,6).join(", ")+")";
     impStatus(msg);
   }catch(e){ impStatus(T("err")+(e.message||e)); }
 }
@@ -829,6 +911,12 @@ async function handleFile(file){
   ["dragover","dragenter"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add("over");}));
   ["dragleave","drop"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove("over");}));
   drop.addEventListener("drop",e=>handleFile(e.dataTransfer.files[0]));
+  const hand=$("imp-hand"), visRow=$("vis-row"), visKey=$("vis-key");
+  if(hand&&visRow){
+    try{ if(visKey) visKey.value=localStorage.getItem("nm_viskey")||""; }catch(e){}
+    hand.addEventListener("change",()=>{ visRow.hidden=!hand.checked; });
+    if(visKey) visKey.addEventListener("change",()=>{ try{localStorage.setItem("nm_viskey",visKey.value.trim());}catch(e){} });
+  }
   $("imp-trad").addEventListener("click",()=>{
     const t=$("imp-text").value.trim(); if(!t) return;
     const lang=$("imp-lang").value;
@@ -868,7 +956,9 @@ const I18N={
   impNone:"Aucun texte détecté. S'il s'agit d'un scan, cochez « forcer l'OCR ».",err:"Erreur : ",ocrModel:"Téléchargement du modèle OCR…",
   "cat:Salutations":"Salutations","cat:Vœux et bénédictions":"Vœux et bénédictions","cat:Hospitalité":"Hospitalité","cat:Événements de la vie":"Événements de la vie","cat:Religion et fêtes":"Religion et fêtes","cat:Respect des aînés":"Respect des aînés","cat:Voyage":"Voyage",phrQ:"Décrivez la situation… ex : quelqu\u2019un a acheté un nouvel habit",phrFound:"Expressions pour cette situation","cat:Politesse":"Politesse","cat:Base":"Base","cat:Conversation":"Conversation","cat:Langue":"Langue","cat:Sentiments":"Sentiments",
   numN:"Nombre",numCE:"Tchétchène",numTL:"Translit.",numST:"Structure",
-  install:"Installer",copy:"Copier",copied:"Copié !",adapted1p:"adapté à la 1re personne (« je ») — ву pour un homme, ю pour une femme",badgeRule:"règle",histT:"Historique",histEmpty:"Aucun historique pour l\u2019instant.",histClear:"Effacer",ocrLow:"confiance faible : une photo droite, nette et bien éclairée d\u2019un texte imprimé donnera un bien meilleur résultat.",installHow:"Pour installer l\u2019application :\niPhone/iPad : Safari \u2192 bouton Partager \u2192 \u00ab Sur l\u2019\u00e9cran d\u2019accueil \u00bb.\nAndroid/PC : menu du navigateur \u2192 \u00ab Installer l\u2019application \u00bb.",
+  install:"Installer",copy:"Copier",copied:"Copié !",adapted1p:"adapté à la 1re personne (« je ») — ву pour un homme, ю pour une femme",badgeRule:"règle",histT:"Historique",histEmpty:"Aucun historique pour l\u2019instant.",histClear:"Effacer",ocrLow:"confiance faible : une photo droite, nette et bien éclairée d\u2019un texte imprimé donnera un bien meilleur résultat.",
+  lblHand:"écriture manuscrite (OCR cloud)",visNoKey:"L\u2019écriture manuscrite nécessite une clé Google Vision (gratuite, 1\u00a0000 images/mois). Créez-la sur console.cloud.google.com (API Vision \u2192 Identifiants \u2192 Clé API), puis collez-la ci-dessus : elle reste sur cet appareil.",
+  fixedN:"{n} mot(s) corrigé(s) via le dictionnaire",langDet:"langue détectée",installHow:"Pour installer l\u2019application :\niPhone/iPad : Safari \u2192 bouton Partager \u2192 \u00ab Sur l\u2019\u00e9cran d\u2019accueil \u00bb.\nAndroid/PC : menu du navigateur \u2192 \u00ab Installer l\u2019application \u00bb.",
   aboutHtml:`<h2>Noxchiyn Mott — Нохчийн мотт</h2>
    <p>Dictionnaire et traducteur pour la langue tchétchène, construit à partir de sources publiées et vérifiables. Chaque résultat affiche sa source :</p>
    <p><span class="badge b-high">dictionnaire</span> dictionnaires publiés (Wiktionary, Matsiev…) · <span class="badge b-mid">Manuel</span> méthodes de langue · <span class="badge b-low">MT en ligne</span> traduction automatique, à vérifier.</p>
@@ -899,7 +989,9 @@ const I18N={
   impNone:"Текст не обнаружен. Если это скан, включите «принудительный OCR».",err:"Ошибка: ",ocrModel:"Загрузка модели OCR…",
   "cat:Salutations":"Приветствия","cat:Vœux et bénédictions":"Пожелания и благословения","cat:Hospitalité":"Гостеприимство","cat:Événements de la vie":"События жизни","cat:Religion et fêtes":"Религия и праздники","cat:Respect des aînés":"Уважение к старшим","cat:Voyage":"Дорога",phrQ:"Опишите ситуацию… напр.: человек купил обновку",phrFound:"Выражения для этой ситуации","cat:Politesse":"Вежливость","cat:Base":"Основное","cat:Conversation":"Разговор","cat:Langue":"Язык","cat:Sentiments":"Чувства",
   numN:"Число",numCE:"Чеченский",numTL:"Транслит.",numST:"Структура",
-  install:"Установить",copy:"Копировать",copied:"Скопировано!",adapted1p:"адаптировано к 1-му лицу («я») — ву для мужчины, ю для женщины",badgeRule:"правило",histT:"История",histEmpty:"История пока пуста.",histClear:"Очистить",ocrLow:"низкая уверенность: прямое, чёткое и хорошо освещённое фото печатного текста даст куда лучший результат.",installHow:"Установка приложения:\niPhone/iPad: Safari \u2192 Поделиться \u2192 \u00abНа экран \u00abДомой\u00bb\u00bb.\nAndroid/ПК: меню браузера \u2192 \u00abУстановить приложение\u00bb.",
+  install:"Установить",copy:"Копировать",copied:"Скопировано!",adapted1p:"адаптировано к 1-му лицу («я») — ву для мужчины, ю для женщины",badgeRule:"правило",histT:"История",histEmpty:"История пока пуста.",histClear:"Очистить",ocrLow:"низкая уверенность: прямое, чёткое и хорошо освещённое фото печатного текста даст куда лучший результат.",
+  lblHand:"рукописный текст (облачный OCR)",visNoKey:"Для рукописного текста нужен ключ Google Vision (бесплатно, 1\u00a0000 изображений/мес). Создайте его на console.cloud.google.com и вставьте выше: он хранится на этом устройстве.",
+  fixedN:"{n} слов(а) исправлено по словарю",langDet:"обнаружен язык",installHow:"Установка приложения:\niPhone/iPad: Safari \u2192 Поделиться \u2192 \u00abНа экран \u00abДомой\u00bb\u00bb.\nAndroid/ПК: меню браузера \u2192 \u00abУстановить приложение\u00bb.",
   aboutHtml:`<h2>Noxchiyn Mott — Нохчийн мотт</h2>
    <p>Словарь и переводчик чеченского языка, построенный на опубликованных и проверяемых источниках. Каждый результат показывает свой источник:</p>
    <p><span class="badge b-high">словарь</span> изданные словари (Wiktionary, Мациев…) · <span class="badge b-mid">Учебник</span> учебные пособия · <span class="badge b-low">онлайн-МП</span> машинный перевод, требует проверки.</p>
@@ -930,7 +1022,9 @@ const I18N={
   impNone:"No text detected. If it is a scan, enable “force OCR”.",err:"Error: ",ocrModel:"Downloading OCR model…",
   "cat:Salutations":"Greetings","cat:Vœux et bénédictions":"Wishes & blessings","cat:Hospitalité":"Hospitality","cat:Événements de la vie":"Life events","cat:Religion et fêtes":"Religion & holidays","cat:Respect des aînés":"Respect for elders","cat:Voyage":"Travel",phrQ:"Describe the situation… e.g. someone bought new clothes",phrFound:"Phrases for this situation","cat:Politesse":"Politeness","cat:Base":"Basics","cat:Conversation":"Conversation","cat:Langue":"Language","cat:Sentiments":"Feelings",
   numN:"Number",numCE:"Chechen",numTL:"Translit.",numST:"Structure",
-  install:"Install",copy:"Copy",copied:"Copied!",adapted1p:"adapted to 1st person (\u201cI\u201d) \u2014 ву for a man, ю for a woman",badgeRule:"rule",histT:"History",histEmpty:"No history yet.",histClear:"Clear",ocrLow:"low confidence: a straight, sharp, well-lit photo of printed text will work much better.",installHow:"To install the app:\niPhone/iPad: Safari \u2192 Share \u2192 \u201cAdd to Home Screen\u201d.\nAndroid/PC: browser menu \u2192 \u201cInstall app\u201d.",
+  install:"Install",copy:"Copy",copied:"Copied!",adapted1p:"adapted to 1st person (\u201cI\u201d) \u2014 ву for a man, ю for a woman",badgeRule:"rule",histT:"History",histEmpty:"No history yet.",histClear:"Clear",ocrLow:"low confidence: a straight, sharp, well-lit photo of printed text will work much better.",
+  lblHand:"handwriting (cloud OCR)",visNoKey:"Handwriting needs a Google Vision key (free, 1,000 images/month). Create it at console.cloud.google.com and paste it above: it stays on this device.",
+  fixedN:"{n} word(s) corrected via the dictionary",langDet:"detected language",installHow:"To install the app:\niPhone/iPad: Safari \u2192 Share \u2192 \u201cAdd to Home Screen\u201d.\nAndroid/PC: browser menu \u2192 \u201cInstall app\u201d.",
   aboutHtml:`<h2>Noxchiyn Mott — Нохчийн мотт</h2>
    <p>A dictionary and translator for the Chechen language, built from published, verifiable sources. Every result shows its source:</p>
    <p><span class="badge b-high">dictionary</span> published dictionaries (Wiktionary, Matsiev…) · <span class="badge b-mid">Textbook</span> language courses · <span class="badge b-low">online MT</span> machine translation, to be verified.</p>
@@ -957,7 +1051,7 @@ function applyLang(l){
   $("btn-trad").textContent=T("btnTrad");
   const set=(id,k)=>{const el=$(id);if(el)el.textContent=T(k);};
   set("lbl-mt","mt");set("sub-title","sub");set("lbl-imp-lang","docLang");set("lbl-ocr","ocrForce");
-  set("drop-text","dropTxt");set("imp-hint","impHint");set("phrases-hint","phrasesHint");set("num-hint","numHint");
+  set("drop-text","dropTxt");set("lbl-hand","lblHand");set("imp-hint","impHint");set("phrases-hint","phrasesHint");set("num-hint","numHint");
   $("trad-in").placeholder=T("phTrad");
   $("dico-q").placeholder=T("phDico");
   $("num-in").placeholder=T("phNum");
@@ -1089,7 +1183,7 @@ histWire("btn-hist-d","hist-d","nm_h_dico",it=>{
 })();
 
 /* ---------- version visible (diagnostic cache) ---------- */
-(function(){const v=document.getElementById("ver");if(v)v.textContent="· v28";})();
+(function(){const v=document.getElementById("ver");if(v)v.textContent="· v29";})();
 
 /* ---------- PWA ---------- */
 if("serviceWorker" in navigator && location.protocol.startsWith("http")){
