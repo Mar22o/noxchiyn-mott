@@ -701,29 +701,63 @@ function cleanCe(t){
   return t.replace(/(?<=[а-яА-ЯёЁьъ])[1Il|](?=[а-яА-ЯёЁьъ])/g,"ӏ")
           .replace(/(?<=^|[\s«"(])[1I|](?=[а-яё])/gm,"Ӏ");
 }
-// prétraitement image : agrandissement, niveaux de gris, contraste étiré — améliore nettement l'OCR
-async function preOcr(file){
+// ---------- OCR amélioré : modèles « best », variantes de prétraitement, choix par confiance ----------
+const TESS_BEST="https://cdn.jsdelivr.net/gh/tesseract-ocr/tessdata_best@4.1.0";
+let OCR_WORKER=null, OCR_LANG=null, lastOcrConf=null;
+async function getOcrWorker(lang){
+  if(!window.Tesseract && !await loadScript(CDN.tesseract)) throw new Error("OCR inaccessible (internet requis)");
+  if(OCR_WORKER && OCR_LANG===lang) return OCR_WORKER;
+  if(OCR_WORKER){ try{await OCR_WORKER.terminate();}catch(e){} OCR_WORKER=null; }
+  impStatus(T("ocrModel"));
+  OCR_WORKER=await Tesseract.createWorker(lang,1,{
+    langPath:TESS_BEST, gzip:false,   // modèles "best" : bien plus précis que les "fast" par défaut
+    logger:m=>{ if(m.status==="recognizing text") impStatus(`OCR… ${Math.round(m.progress*100)} %`); }
+  });
+  await OCR_WORKER.setParameters({user_defined_dpi:"300",preserve_interword_spaces:"1"});
+  OCR_LANG=lang;
+  return OCR_WORKER;
+}
+// deux variantes de prétraitement : (1) gris + contraste étiré (+ inversion auto si fond sombre),
+// (2) binarisation adaptative par tuiles (robuste aux éclairages inégaux des photos)
+async function preVariants(file){
   const img=await createImageBitmap(file);
-  const scale=Math.min(3.5,Math.max(1,1800/Math.max(img.width,img.height)));
+  const scale=Math.min(4,Math.max(1,2400/Math.max(img.width,img.height)));
   const w=Math.round(img.width*scale), h=Math.round(img.height*scale);
   const cv=document.createElement("canvas"); cv.width=w; cv.height=h;
-  const cx=cv.getContext("2d"); cx.imageSmoothingQuality="high";
-  cx.drawImage(img,0,0,w,h);
+  const cx=cv.getContext("2d"); cx.imageSmoothingQuality="high"; cx.drawImage(img,0,0,w,h);
   const d=cx.getImageData(0,0,w,h), p=d.data;
-  let min=255,max=0;
-  for(let i=0;i<p.length;i+=4){const g=.299*p[i]+.587*p[i+1]+.114*p[i+2];p[i]=p[i+1]=p[i+2]=g;if(g<min)min=g;if(g>max)max=g;}
-  const rg=Math.max(1,max-min);
-  for(let i=0;i<p.length;i+=4){const g=(p[i]-min)*255/rg;p[i]=p[i+1]=p[i+2]=g;}
+  let min=255,max=0,sum=0;
+  const g=new Float32Array(w*h);
+  for(let i=0,j=0;i<p.length;i+=4,j++){const v=.299*p[i]+.587*p[i+1]+.114*p[i+2];g[j]=v;sum+=v;if(v<min)min=v;if(v>max)max=v;}
+  const dark=(sum/(w*h))<110, rg=Math.max(1,max-min);
+  for(let i=0,j=0;i<p.length;i+=4,j++){let v=(g[j]-min)*255/rg; if(dark)v=255-v; p[i]=p[i+1]=p[i+2]=v;}
   cx.putImageData(d,0,0);
-  return cv;
+  const cv2=document.createElement("canvas"); cv2.width=w; cv2.height=h;
+  const cx2=cv2.getContext("2d"); cx2.drawImage(cv,0,0);
+  const d2=cx2.getImageData(0,0,w,h), p2=d2.data, TS=32;
+  for(let ty=0;ty<h;ty+=TS)for(let tx=0;tx<w;tx+=TS){
+    let s=0,n=0;
+    const yl=Math.min(ty+TS,h), xl=Math.min(tx+TS,w);
+    for(let y=ty;y<yl;y++)for(let x=tx;x<xl;x++){s+=p2[(y*w+x)*4];n++;}
+    const th=s/n-8;
+    for(let y=ty;y<yl;y++)for(let x=tx;x<xl;x++){
+      const k=(y*w+x)*4, v=p2[k]>th?255:0; p2[k]=p2[k+1]=p2[k+2]=v;
+    }
+  }
+  cx2.putImageData(d2,0,0);
+  return [cv,cv2];
 }
-async function ocrImage(img,lang){
-  if(!window.Tesseract && !await loadScript(CDN.tesseract)) throw new Error("OCR inaccessible (internet requis)");
-  const r=await Tesseract.recognize(img,lang,{logger:m=>{
-    if(m.status==="recognizing text") impStatus(`OCR… ${Math.round(m.progress*100)} %`);
-    else if(m.status==="loading language traineddata") impStatus(T("ocrModel"));
-  }});
-  return r.data.text;
+async function ocrImage(src,lang){
+  const wk=await getOcrWorker(lang);
+  const variants=(src instanceof HTMLCanvasElement)?[src]:await preVariants(src);
+  let best=null;
+  for(const v of variants){
+    const r=await wk.recognize(v);
+    if(!best||r.data.confidence>best.data.confidence) best=r;
+    if(best.data.confidence>=85) break;  // assez bon : inutile d'essayer les autres variantes
+  }
+  lastOcrConf=Math.round(best.data.confidence);
+  return best.data.text;
 }
 async function extractFile(file){
   const ext=(file.name.split(".").pop()||"").toLowerCase();
@@ -763,7 +797,7 @@ async function extractFile(file){
   }
   else if(["png","jpg","jpeg","webp","bmp","gif"].includes(ext)){
     impStatus(T("impPrep"));
-    text=await ocrImage(await preOcr(file),ocrLang);
+    text=await ocrImage(file,ocrLang);
   }
   else if(ext==="doc"){ throw new Error("Format .doc ancien non pris en charge : enregistrez le fichier en .docx"); }
   else{ throw new Error("Format non pris en charge : "+ext); }
@@ -773,11 +807,19 @@ async function extractFile(file){
 }
 async function handleFile(file){
   if(!file) return;
+  lastOcrConf=null;
+  const prev=$("imp-prev");
+  if(prev){
+    if(/^image\//.test(file.type||"")){ try{prev.src=URL.createObjectURL(file);prev.hidden=false;}catch(e){} }
+    else prev.hidden=true;
+  }
   try{
     impStatus(T("impReading")+" « "+file.name+" »…");
     const t=await extractFile(file);
     $("imp-text").value=t;
-    impStatus(t?T("impDone").replace("{n}",t.length):T("impNone"));
+    let msg=t?T("impDone").replace("{n}",t.length):T("impNone");
+    if(lastOcrConf!=null){ msg+=" · OCR "+lastOcrConf+" %"; if(lastOcrConf<60) msg+=" — "+T("ocrLow"); }
+    impStatus(msg);
   }catch(e){ impStatus(T("err")+(e.message||e)); }
 }
 (function(){
@@ -826,7 +868,7 @@ const I18N={
   impNone:"Aucun texte détecté. S'il s'agit d'un scan, cochez « forcer l'OCR ».",err:"Erreur : ",ocrModel:"Téléchargement du modèle OCR…",
   "cat:Salutations":"Salutations","cat:Vœux et bénédictions":"Vœux et bénédictions","cat:Hospitalité":"Hospitalité","cat:Événements de la vie":"Événements de la vie","cat:Religion et fêtes":"Religion et fêtes","cat:Respect des aînés":"Respect des aînés","cat:Voyage":"Voyage",phrQ:"Décrivez la situation… ex : quelqu\u2019un a acheté un nouvel habit",phrFound:"Expressions pour cette situation","cat:Politesse":"Politesse","cat:Base":"Base","cat:Conversation":"Conversation","cat:Langue":"Langue","cat:Sentiments":"Sentiments",
   numN:"Nombre",numCE:"Tchétchène",numTL:"Translit.",numST:"Structure",
-  install:"Installer",copy:"Copier",copied:"Copié !",adapted1p:"adapté à la 1re personne (« je ») — ву pour un homme, ю pour une femme",badgeRule:"règle",histT:"Historique",histEmpty:"Aucun historique pour l\u2019instant.",histClear:"Effacer",installHow:"Pour installer l\u2019application :\niPhone/iPad : Safari \u2192 bouton Partager \u2192 \u00ab Sur l\u2019\u00e9cran d\u2019accueil \u00bb.\nAndroid/PC : menu du navigateur \u2192 \u00ab Installer l\u2019application \u00bb.",
+  install:"Installer",copy:"Copier",copied:"Copié !",adapted1p:"adapté à la 1re personne (« je ») — ву pour un homme, ю pour une femme",badgeRule:"règle",histT:"Historique",histEmpty:"Aucun historique pour l\u2019instant.",histClear:"Effacer",ocrLow:"confiance faible : une photo droite, nette et bien éclairée d\u2019un texte imprimé donnera un bien meilleur résultat.",installHow:"Pour installer l\u2019application :\niPhone/iPad : Safari \u2192 bouton Partager \u2192 \u00ab Sur l\u2019\u00e9cran d\u2019accueil \u00bb.\nAndroid/PC : menu du navigateur \u2192 \u00ab Installer l\u2019application \u00bb.",
   aboutHtml:`<h2>Noxchiyn Mott — Нохчийн мотт</h2>
    <p>Dictionnaire et traducteur pour la langue tchétchène, construit à partir de sources publiées et vérifiables. Chaque résultat affiche sa source :</p>
    <p><span class="badge b-high">dictionnaire</span> dictionnaires publiés (Wiktionary, Matsiev…) · <span class="badge b-mid">Manuel</span> méthodes de langue · <span class="badge b-low">MT en ligne</span> traduction automatique, à vérifier.</p>
@@ -857,7 +899,7 @@ const I18N={
   impNone:"Текст не обнаружен. Если это скан, включите «принудительный OCR».",err:"Ошибка: ",ocrModel:"Загрузка модели OCR…",
   "cat:Salutations":"Приветствия","cat:Vœux et bénédictions":"Пожелания и благословения","cat:Hospitalité":"Гостеприимство","cat:Événements de la vie":"События жизни","cat:Religion et fêtes":"Религия и праздники","cat:Respect des aînés":"Уважение к старшим","cat:Voyage":"Дорога",phrQ:"Опишите ситуацию… напр.: человек купил обновку",phrFound:"Выражения для этой ситуации","cat:Politesse":"Вежливость","cat:Base":"Основное","cat:Conversation":"Разговор","cat:Langue":"Язык","cat:Sentiments":"Чувства",
   numN:"Число",numCE:"Чеченский",numTL:"Транслит.",numST:"Структура",
-  install:"Установить",copy:"Копировать",copied:"Скопировано!",adapted1p:"адаптировано к 1-му лицу («я») — ву для мужчины, ю для женщины",badgeRule:"правило",histT:"История",histEmpty:"История пока пуста.",histClear:"Очистить",installHow:"Установка приложения:\niPhone/iPad: Safari \u2192 Поделиться \u2192 \u00abНа экран \u00abДомой\u00bb\u00bb.\nAndroid/ПК: меню браузера \u2192 \u00abУстановить приложение\u00bb.",
+  install:"Установить",copy:"Копировать",copied:"Скопировано!",adapted1p:"адаптировано к 1-му лицу («я») — ву для мужчины, ю для женщины",badgeRule:"правило",histT:"История",histEmpty:"История пока пуста.",histClear:"Очистить",ocrLow:"низкая уверенность: прямое, чёткое и хорошо освещённое фото печатного текста даст куда лучший результат.",installHow:"Установка приложения:\niPhone/iPad: Safari \u2192 Поделиться \u2192 \u00abНа экран \u00abДомой\u00bb\u00bb.\nAndroid/ПК: меню браузера \u2192 \u00abУстановить приложение\u00bb.",
   aboutHtml:`<h2>Noxchiyn Mott — Нохчийн мотт</h2>
    <p>Словарь и переводчик чеченского языка, построенный на опубликованных и проверяемых источниках. Каждый результат показывает свой источник:</p>
    <p><span class="badge b-high">словарь</span> изданные словари (Wiktionary, Мациев…) · <span class="badge b-mid">Учебник</span> учебные пособия · <span class="badge b-low">онлайн-МП</span> машинный перевод, требует проверки.</p>
@@ -888,7 +930,7 @@ const I18N={
   impNone:"No text detected. If it is a scan, enable “force OCR”.",err:"Error: ",ocrModel:"Downloading OCR model…",
   "cat:Salutations":"Greetings","cat:Vœux et bénédictions":"Wishes & blessings","cat:Hospitalité":"Hospitality","cat:Événements de la vie":"Life events","cat:Religion et fêtes":"Religion & holidays","cat:Respect des aînés":"Respect for elders","cat:Voyage":"Travel",phrQ:"Describe the situation… e.g. someone bought new clothes",phrFound:"Phrases for this situation","cat:Politesse":"Politeness","cat:Base":"Basics","cat:Conversation":"Conversation","cat:Langue":"Language","cat:Sentiments":"Feelings",
   numN:"Number",numCE:"Chechen",numTL:"Translit.",numST:"Structure",
-  install:"Install",copy:"Copy",copied:"Copied!",adapted1p:"adapted to 1st person (\u201cI\u201d) \u2014 ву for a man, ю for a woman",badgeRule:"rule",histT:"History",histEmpty:"No history yet.",histClear:"Clear",installHow:"To install the app:\niPhone/iPad: Safari \u2192 Share \u2192 \u201cAdd to Home Screen\u201d.\nAndroid/PC: browser menu \u2192 \u201cInstall app\u201d.",
+  install:"Install",copy:"Copy",copied:"Copied!",adapted1p:"adapted to 1st person (\u201cI\u201d) \u2014 ву for a man, ю for a woman",badgeRule:"rule",histT:"History",histEmpty:"No history yet.",histClear:"Clear",ocrLow:"low confidence: a straight, sharp, well-lit photo of printed text will work much better.",installHow:"To install the app:\niPhone/iPad: Safari \u2192 Share \u2192 \u201cAdd to Home Screen\u201d.\nAndroid/PC: browser menu \u2192 \u201cInstall app\u201d.",
   aboutHtml:`<h2>Noxchiyn Mott — Нохчийн мотт</h2>
    <p>A dictionary and translator for the Chechen language, built from published, verifiable sources. Every result shows its source:</p>
    <p><span class="badge b-high">dictionary</span> published dictionaries (Wiktionary, Matsiev…) · <span class="badge b-mid">Textbook</span> language courses · <span class="badge b-low">online MT</span> machine translation, to be verified.</p>
@@ -1047,7 +1089,7 @@ histWire("btn-hist-d","hist-d","nm_h_dico",it=>{
 })();
 
 /* ---------- version visible (diagnostic cache) ---------- */
-(function(){const v=document.getElementById("ver");if(v)v.textContent="· v27";})();
+(function(){const v=document.getElementById("ver");if(v)v.textContent="· v28";})();
 
 /* ---------- PWA ---------- */
 if("serviceWorker" in navigator && location.protocol.startsWith("http")){

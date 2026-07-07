@@ -189,3 +189,6 @@ body.dark input,body.dark textarea,body.dark select{color-scheme:dark}
 .hist-item:hover{background:var(--soft)}
 .hist-item:last-child{border-bottom:none}
 .hist-item .hq{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* aperçu du fichier importé */
+.imp-prev{max-height:150px;max-width:100%;border:1px solid var(--line);border-radius:10px;margin:6px 0;display:block}
