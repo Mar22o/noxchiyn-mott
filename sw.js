@@ -1,5 +1,5 @@
 // Service worker : cache local pour fonctionner hors ligne (dictionnaire inclus)
-const CACHE = "noxchiyn-mott-v16";
+const CACHE = "noxchiyn-mott-v18";
 const FILES = ["./","./index.html","./style.css","./app.js",
   "./data/dict.js","./data/phrases.js","./manifest.webmanifest","./icons/icon.svg"];
 self.addEventListener("install", e => {
@@ -12,6 +12,8 @@ self.addEventListener("activate", e => {
 self.addEventListener("fetch", e => {
   const u = e.request.url;
   if (u.includes("translate.googleapis.com")) return; // MT : toujours réseau
+  if (u.includes("googlesyndication") || u.includes("doubleclick") ||
+      u.includes("adtrafficquality") || u.includes("googleadservices")) return; // publicité : jamais interceptée
   if (u.includes("fonts.googleapis.com") || u.includes("fonts.gstatic.com")
       || u.includes("cdnjs.cloudflare.com") || u.includes("cdn.jsdelivr.net")) {
     // polices et bibliothèques (PDF, Word, OCR) : cache après premier chargement

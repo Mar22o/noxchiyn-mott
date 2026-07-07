@@ -70,9 +70,9 @@ function lookup(q,lang){
   return {exact,partial};
 }
 // mots-outils ignorés dans le mot à mot (ils polluaient les résultats)
-const STOP_FR=new Set("le la les l un une des de du d en y ce cet cette ces se sa son ses mon ma mes ton ta tes notre nos votre vos leur leurs je tu il elle on nous vous ils elles me te lui ne pas plus que qui quoi dont ou et mais donc or ni car a au aux dans pour par sur sous avec sans est es suis sommes etes sont etait etais serai sera ai as avons avez ont avait aura tres trop peu si comme".split(" "));
-const STOP_EN=new Set("the a an to of in on at is are am was were be been do does did and or but not no i you he she it we they me him her us them my your his its our their this that these those".split(" "));
-const STOP_RU=new Set("и в на не с к у о а же бы ли что как это я ты он она оно мы вы они мой твой его ее наш ваш их за из по до от для при".split(" "));
+const STOP_FR=new Set("le la les l un une des de du d en y ce cet cette ces se sa son ses mon ma mes ton ta tes notre nos votre vos leur leurs je tu il elle on nous vous ils elles me te lui ne pas plus que qui quoi dont ou et mais donc or ni car a au aux dans pour par sur sous avec sans est es suis sommes etes sont etait etais serai sera ai as avons avez ont avait aura tres trop peu si comme vais vas va allons allez vont aller fais fait faisons faites font faire veux veut voulons voulez veulent vouloir peux peut pouvons pouvez peuvent dois doit devons devez doivent quand quel quelle quels quelles dire dis dit chez cela quelqu quelque".split(" "));
+const STOP_EN=new Set("the a an to of in on at is are am was were be been do does did and or but not no i you he she it we they me him her us them my your his its our their this that these those go going goes went want wants need needs say says said what when someone somebody".split(" "));
+const STOP_RU=new Set("и в на не с к у о а же бы ли что как это я ты он она оно мы вы они мой твой его ее наш ваш их за из по до от для при иду идет хочу хочет надо нужно если когда кто-то сказать говорить".split(" "));
 function isStop(w,lang){const x=normFr(w);
   return lang==="fr"?STOP_FR.has(x):lang==="en"?STOP_EN.has(x):lang==="ru"?STOP_RU.has(x):false;}
 
@@ -495,13 +495,15 @@ function situationSearch(v){
   if(!words.length) return [];
   const scored=[];
   for(const p of NM_PHRASES){
-    const hay=normFr([p.ce,p.fr,p.k||"",p.ke||"",p.kr||"",p.cat].join(" "));
-    let s=0; for(const w of words){ if(hay.includes(w)) s++; }
+    const hayK=normFr([p.k||"",p.ke||"",p.kr||"",p.cat].join(" "));   // mots-clés de situation
+    const hayT=normFr([p.ce,p.fr].join(" "));                          // texte de la fiche
+    let s=0; for(const w of words){ if(hayK.includes(w)) s+=2; else if(hayT.includes(w)) s+=1; }
     if(s>0) scored.push([s,p]);
   }
   scored.sort((a,b)=>b[0]-a[0]);
   const best=scored[0]?scored[0][0]:0;
-  return scored.filter(x=>x[0]>=Math.max(1,best-1)).slice(0,6).map(x=>x[1]);
+  const seuil=best>=2?best-0:1;   // si une bonne correspondance existe, ne garder que le haut du panier
+  return scored.filter(x=>x[0]>=seuil).slice(0,6).map(x=>x[1]);
 }
 (function(){
   const q=document.getElementById("phr-q"); if(!q) return;
