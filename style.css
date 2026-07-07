@@ -122,9 +122,32 @@ footer{text-align:center;color:var(--mut);font-size:.8rem;padding:18px;border-to
 footer .dot{color:var(--gold)}
 
 @media(max-width:600px){
-  h1{font-size:1.2rem}
-  nav#tabs button{padding:8px 9px;font-size:.85rem}
-  .lang-bar{flex-wrap:wrap}
+  /* en-tête : titre sur la 1re ligne, commandes sur la 2e */
+  h1{font-size:1.12rem}
+  .sub{display:none}
+  .logo{width:30px;height:30px}
+  .brand{flex-wrap:wrap;row-gap:8px}
+  .brand>div{flex:1 1 calc(100% - 44px);min-width:0}
+  .ui-lang{margin-left:0;padding:6px 9px;font-size:.83rem}
+  #btn-install{margin-left:auto !important}
+  /* onglets : une seule ligne, défilement horizontal fluide */
+  nav#tabs{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+  nav#tabs::-webkit-scrollbar{display:none}
+  nav#tabs button{padding:9px 11px;font-size:.88rem;white-space:nowrap;flex:none}
+  /* contenu : marges réduites, cibles tactiles plus grandes */
+  main{padding:14px 10px 30px}
+  .card{padding:12px}
+  .lang-bar{flex-wrap:nowrap}
+  .lang-bar select{flex:1;min-width:0;padding:9px 8px}
+  button.primary{width:100%;padding:13px;font-size:1.02rem}
+  .mt-toggle{width:100%}
+  .kbd button{min-width:30px;padding:6px 7px;font-size:.95rem}
+  .kbd-space{min-width:100px !important}
+  .kbd-full{padding:6px 4px}
+  .kbd-row{gap:4px}
+  .entry .tr{min-width:130px}
+  th,td{padding:6px 7px;font-size:.85rem}
+  .senses{min-width:150px}
 }
 
 /* lisibilité mode sombre : liens, menus, sélection */
