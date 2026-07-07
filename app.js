@@ -942,6 +942,11 @@ function applyLang(l){
   function set(v){ dark=v;
     document.body.classList.toggle("dark",v);
     b.textContent=v?"☀️":"🌙";
+    // opt-out du "mode sombre forcé" des navigateurs mobiles :
+    // clair = only light (interdit l'assombrissement auto), sombre = dark
+    document.documentElement.style.colorScheme=v?"dark":"only light";
+    const cs=document.querySelector('meta[name="color-scheme"]');
+    if(cs) cs.setAttribute("content",v?"dark":"only light");
     const tc=document.querySelector('meta[name="theme-color"]');
     if(tc) tc.setAttribute("content",v?"#0c2f1d":"#0f5c33");
     try{localStorage.setItem("nm_theme",v?"dark":"light");}catch(e){}
@@ -980,6 +985,9 @@ function applyLang(l){
   window.addEventListener("resize",upd);
   setTimeout(upd,0); setTimeout(upd,600);
 })();
+
+/* ---------- version visible (diagnostic cache) ---------- */
+(function(){const v=document.getElementById("ver");if(v)v.textContent="· v22";})();
 
 /* ---------- PWA ---------- */
 if("serviceWorker" in navigator && location.protocol.startsWith("http")){

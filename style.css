@@ -1,6 +1,6 @@
 /* Noxchiyn Mott — style sobre, identité tchétchène (vert/blanc/rouge/or du drapeau) */
 :root{
-  color-scheme:light;
+  color-scheme:only light;
   --green:#0f5c33; --green-d:#0a4526; --red:#b3272d; --gold:#c9a227;
   --bg:#f7f6f2; --card:#ffffff; --ink:#22302a; --mut:#6b7a72; --line:#e2e0d8;
   --soft:#edf3ee; --header:#0f5c33; --shadow:rgba(0,0,0,.04);
