@@ -389,17 +389,39 @@ async function doTranslate(){
         if(key&&key!==ruQ){ er=lookup(key,"ru");
           rf=dedupe([...er.exact,...er.partial]).filter(r=>r.t==="r"); }
       }
-      if(!rf.length){ // dernier repli : chaque mot russe porteur, un à un
+      // complément systématique : chaque mot russe porteur, un à un, avec racines
+      // (fait remonter le mot exact même si une phrase proche existe, ex. свободен -> мукъа)
+      {
         const cw=ruQ.split(/\s+/).filter(w=>w.length>3&&!STOP_RU.has(w)).slice(0,4);
-        for(const w of cw){ const e3=lookup(w,"ru");
-          rf.push(...dedupe([...e3.exact,...e3.partial]).filter(r=>r.t==="r").slice(0,3)); }
+        for(const w of cw){
+          for(const v of [w,w.slice(0,-1),w.length>5?w.slice(0,-2):null]){
+            if(!v) continue;
+            const e3=lookup(v,"ru");
+            rf.push(...dedupe([...e3.exact,...e3.partial]).filter(r=>r.t==="r").slice(0,3));
+          }
+        }
         rf=dedupe(rf);
       }
       rf=rf.slice(0,8);
-      if(rf.length){
+      // adaptation grammaticale : la question est à la 1re personne mais le dictionnaire
+      // n'a que la 2e (хьо …) -> on propose la forme en со (règle sûre : хьо<->со, copule inchangée)
+      let adapted="";
+      if(/^(je|j'|i)\b/i.test(q)||/^я\b/i.test(ruQ)){
+        const seen=new Set();
+        for(const r of rf.slice(0,5)){
+          if(r.t!=="r") continue;
+          const e=R[r.i];
+          if(/^хьо\s/i.test(e.c)){
+            const g=e.c.replace(/^хьо/i,"со").replace(/[!?]+$/,"");
+            if(seen.has(g)) continue; seen.add(g);
+            adapted+=`<div class="entry"><span class="ce">${esc(g)}</span><span class="lat">${esc(translit(g))}</span><span class="tr">${T("adapted1p")}</span><span class="badge b-mid">${T("badgeRule")}</span></div>`;
+          }
+        }
+      }
+      if(rf.length||adapted){
         const div=document.createElement("div"); div.className="card";
         div.innerHTML=`<h2>${T("cardNear")} <span class="hint" style="font-weight:400">(${T("viaRu")} « ${esc(ruQ)} »)</span></h2>`
-          +renderGrouped(rf,dst);
+          +adapted+renderGrouped(rf,dst);
         out.appendChild(div);
       }
     }catch(e){}
@@ -797,7 +819,7 @@ const I18N={
   impNone:"Aucun texte détecté. S'il s'agit d'un scan, cochez « forcer l'OCR ».",err:"Erreur : ",ocrModel:"Téléchargement du modèle OCR…",
   "cat:Salutations":"Salutations","cat:Vœux et bénédictions":"Vœux et bénédictions","cat:Hospitalité":"Hospitalité","cat:Événements de la vie":"Événements de la vie","cat:Religion et fêtes":"Religion et fêtes","cat:Respect des aînés":"Respect des aînés","cat:Voyage":"Voyage",phrQ:"Décrivez la situation… ex : quelqu\u2019un a acheté un nouvel habit",phrFound:"Expressions pour cette situation","cat:Politesse":"Politesse","cat:Base":"Base","cat:Conversation":"Conversation","cat:Langue":"Langue","cat:Sentiments":"Sentiments",
   numN:"Nombre",numCE:"Tchétchène",numTL:"Translit.",numST:"Structure",
-  install:"Installer",copy:"Copier",copied:"Copié !",installHow:"Pour installer l\u2019application :\niPhone/iPad : Safari \u2192 bouton Partager \u2192 \u00ab Sur l\u2019\u00e9cran d\u2019accueil \u00bb.\nAndroid/PC : menu du navigateur \u2192 \u00ab Installer l\u2019application \u00bb.",
+  install:"Installer",copy:"Copier",copied:"Copié !",adapted1p:"adapté à la 1re personne (« je ») — ву pour un homme, ю pour une femme",badgeRule:"règle",installHow:"Pour installer l\u2019application :\niPhone/iPad : Safari \u2192 bouton Partager \u2192 \u00ab Sur l\u2019\u00e9cran d\u2019accueil \u00bb.\nAndroid/PC : menu du navigateur \u2192 \u00ab Installer l\u2019application \u00bb.",
   aboutHtml:`<h2>Noxchiyn Mott — Нохчийн мотт</h2>
    <p>Dictionnaire et traducteur pour la langue tchétchène, construit à partir de sources publiées et vérifiables. Chaque résultat affiche sa source :</p>
    <p><span class="badge b-high">dictionnaire</span> dictionnaires publiés (Wiktionary, Matsiev…) · <span class="badge b-mid">Manuel</span> méthodes de langue · <span class="badge b-low">MT en ligne</span> traduction automatique, à vérifier.</p>
@@ -828,7 +850,7 @@ const I18N={
   impNone:"Текст не обнаружен. Если это скан, включите «принудительный OCR».",err:"Ошибка: ",ocrModel:"Загрузка модели OCR…",
   "cat:Salutations":"Приветствия","cat:Vœux et bénédictions":"Пожелания и благословения","cat:Hospitalité":"Гостеприимство","cat:Événements de la vie":"События жизни","cat:Religion et fêtes":"Религия и праздники","cat:Respect des aînés":"Уважение к старшим","cat:Voyage":"Дорога",phrQ:"Опишите ситуацию… напр.: человек купил обновку",phrFound:"Выражения для этой ситуации","cat:Politesse":"Вежливость","cat:Base":"Основное","cat:Conversation":"Разговор","cat:Langue":"Язык","cat:Sentiments":"Чувства",
   numN:"Число",numCE:"Чеченский",numTL:"Транслит.",numST:"Структура",
-  install:"Установить",copy:"Копировать",copied:"Скопировано!",installHow:"Установка приложения:\niPhone/iPad: Safari \u2192 Поделиться \u2192 \u00abНа экран \u00abДомой\u00bb\u00bb.\nAndroid/ПК: меню браузера \u2192 \u00abУстановить приложение\u00bb.",
+  install:"Установить",copy:"Копировать",copied:"Скопировано!",adapted1p:"адаптировано к 1-му лицу («я») — ву для мужчины, ю для женщины",badgeRule:"правило",installHow:"Установка приложения:\niPhone/iPad: Safari \u2192 Поделиться \u2192 \u00abНа экран \u00abДомой\u00bb\u00bb.\nAndroid/ПК: меню браузера \u2192 \u00abУстановить приложение\u00bb.",
   aboutHtml:`<h2>Noxchiyn Mott — Нохчийн мотт</h2>
    <p>Словарь и переводчик чеченского языка, построенный на опубликованных и проверяемых источниках. Каждый результат показывает свой источник:</p>
    <p><span class="badge b-high">словарь</span> изданные словари (Wiktionary, Мациев…) · <span class="badge b-mid">Учебник</span> учебные пособия · <span class="badge b-low">онлайн-МП</span> машинный перевод, требует проверки.</p>
@@ -859,7 +881,7 @@ const I18N={
   impNone:"No text detected. If it is a scan, enable “force OCR”.",err:"Error: ",ocrModel:"Downloading OCR model…",
   "cat:Salutations":"Greetings","cat:Vœux et bénédictions":"Wishes & blessings","cat:Hospitalité":"Hospitality","cat:Événements de la vie":"Life events","cat:Religion et fêtes":"Religion & holidays","cat:Respect des aînés":"Respect for elders","cat:Voyage":"Travel",phrQ:"Describe the situation… e.g. someone bought new clothes",phrFound:"Phrases for this situation","cat:Politesse":"Politeness","cat:Base":"Basics","cat:Conversation":"Conversation","cat:Langue":"Language","cat:Sentiments":"Feelings",
   numN:"Number",numCE:"Chechen",numTL:"Translit.",numST:"Structure",
-  install:"Install",copy:"Copy",copied:"Copied!",installHow:"To install the app:\niPhone/iPad: Safari \u2192 Share \u2192 \u201cAdd to Home Screen\u201d.\nAndroid/PC: browser menu \u2192 \u201cInstall app\u201d.",
+  install:"Install",copy:"Copy",copied:"Copied!",adapted1p:"adapted to 1st person (\u201cI\u201d) \u2014 ву for a man, ю for a woman",badgeRule:"rule",installHow:"To install the app:\niPhone/iPad: Safari \u2192 Share \u2192 \u201cAdd to Home Screen\u201d.\nAndroid/PC: browser menu \u2192 \u201cInstall app\u201d.",
   aboutHtml:`<h2>Noxchiyn Mott — Нохчийн мотт</h2>
    <p>A dictionary and translator for the Chechen language, built from published, verifiable sources. Every result shows its source:</p>
    <p><span class="badge b-high">dictionary</span> published dictionaries (Wiktionary, Matsiev…) · <span class="badge b-mid">Textbook</span> language courses · <span class="badge b-low">online MT</span> machine translation, to be verified.</p>
@@ -987,7 +1009,7 @@ function applyLang(l){
 })();
 
 /* ---------- version visible (diagnostic cache) ---------- */
-(function(){const v=document.getElementById("ver");if(v)v.textContent="· v23";})();
+(function(){const v=document.getElementById("ver");if(v)v.textContent="· v24";})();
 
 /* ---------- PWA ---------- */
 if("serviceWorker" in navigator && location.protocol.startsWith("http")){
