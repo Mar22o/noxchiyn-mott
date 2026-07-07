@@ -987,7 +987,7 @@ function applyLang(l){
 })();
 
 /* ---------- version visible (diagnostic cache) ---------- */
-(function(){const v=document.getElementById("ver");if(v)v.textContent="· v22";})();
+(function(){const v=document.getElementById("ver");if(v)v.textContent="· v23";})();
 
 /* ---------- PWA ---------- */
 if("serviceWorker" in navigator && location.protocol.startsWith("http")){
