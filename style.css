@@ -192,3 +192,12 @@ body.dark input,body.dark textarea,body.dark select{color-scheme:dark}
 
 /* aperçu du fichier importé */
 .imp-prev{max-height:150px;max-width:100%;border:1px solid var(--line);border-radius:10px;margin:6px 0;display:block}
+
+/* onglet importer, épuré */
+.imp-opts{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin:6px 0}
+#imp-adv summary{cursor:pointer;color:var(--green);font-size:.9rem;list-style:none}
+#imp-adv summary::-webkit-details-marker{display:none}
+#imp-adv summary::before{content:"⚙ ";color:var(--gold)}
+.imp-adv-body{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-top:8px}
+.imp-adv-body #vis-key{flex:1;min-width:220px}
+#vis-row{margin:6px 0}
