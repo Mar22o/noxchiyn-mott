@@ -233,6 +233,35 @@ async function fixLeaksOnline(ana){
   return ana;
 }
 
+/* ---------- signalement de mauvaise traduction ---------- */
+let lastTrans=null;
+async function sendReport(payload){
+  const email=(window.NM_REPORT_EMAIL||"");
+  if(!email) throw new Error("no-email");
+  const r=await fetch("https://formsubmit.co/ajax/"+encodeURIComponent(email),{
+    method:"POST",headers:{"Content-Type":"application/json",Accept:"application/json"},
+    body:JSON.stringify(payload)});
+  const j=await r.json().catch(()=>({}));
+  if(!(j&&(j.success===true||j.success==="true"))) throw new Error((j&&j.message)||"fail");
+}
+function reportBtn(){
+  const b=document.createElement("button");
+  b.className="copy-btn report-btn"; b.textContent=T("reportBtn");
+  b.addEventListener("click",async()=>{
+    if(!lastTrans) return;
+    if(!(window.NM_REPORT_EMAIL||"")){ b.textContent="✉ "+((window.NM_REPORT_EMAIL)||"—"); return; }
+    let corr=""; try{ corr=window.prompt(T("reportAsk"))||""; }catch(e){}
+    const old=b.textContent; b.textContent=T("reportSending"); b.disabled=true;
+    try{
+      await sendReport({_subject:"Noxchiyn Mott — mauvaise traduction",
+        texte:lastTrans.q, de:lastTrans.src, vers:lastTrans.dst,
+        traduction:lastTrans.out||"", correction:corr, url:location.href, date:new Date().toISOString()});
+      b.textContent="✓ "+T("reportOk");
+    }catch(e){ b.textContent=T("reportErr"); b.disabled=false; setTimeout(()=>{b.textContent=old;},2600); }
+  });
+  return b;
+}
+
 /* ---------- bouton copier ---------- */
 function copyBtn(text){
   const b=document.createElement("button");
@@ -380,8 +409,13 @@ async function doTranslate(){
     html=`<div class="empty">${T("noRes")}</div>`;
   }
   out.innerHTML=html;
+  lastTrans={q:q,src:src,dst:dst,out:""};
   // 3bis. expressions idiomatiques du dictionnaire Matsiev, trouvées en déduisant le sens
   // via le russe (fr -> ru, puis recherche dans les 13 000+ paires expressions russes-tchétchènes)
+  if(refs.length && out.querySelector && !out.querySelector(".report-btn")){
+    const rb=document.createElement("div"); rb.className="card"; rb.style.textAlign="right"; rb.style.padding="8px 14px";
+    rb.appendChild(reportBtn()); out.appendChild(rb);
+  }
   if($("use-mt").checked&&dst==="ce"&&(src==="fr"||src==="en")&&words.length>1&&words.length<=8){
     try{
       const ruQ=(await gtx(src,"ru",q.slice(0,300))).toLowerCase().replace(/[.!?…]+$/,"").trim();
@@ -435,6 +469,20 @@ async function doTranslate(){
     box.className="card mt-box";
     box.innerHTML=`<h2>${T("cardMT")}</h2><p class="hint">${T("mtQuery")}</p>`;
     out.appendChild(box);
+    const aik=aiKey();
+    if(aik){
+      try{
+        const gt=await geminiTranslate(q.slice(0,2000),src,dst,aik);
+        if(gt){
+          box.className="card";
+          let h=`<h2>${T("cardMT")} <span class="badge b-mid">${T("badgeAI")}</span></h2>`
+            +`<p class="ce" style="font-size:1.15rem;font-weight:600">${esc(gt)}</p>`;
+          if(isCyr(gt)) h+=`<p class="lat">${esc(translit(gt))}</p>`;
+          box.innerHTML=h; box.appendChild(copyBtn(gt)); if(lastTrans)lastTrans.out=gt; box.appendChild(reportBtn());
+          return;
+        }
+      }catch(e){ /* repli sur Google Translate */ }
+    }
     const qmt=q.length>1800?q.slice(0,1800):q; // limite de l'API
     try{
       const direct=await gtx(src,dst,qmt).catch(()=>null);
@@ -473,6 +521,8 @@ async function doTranslate(){
       if(q.length>1800) html+=`<p class="hint">${T("mtLong")}</p>`;
       html+=`<p class="warn">${T("mtWarn")}</p>`;
       box.innerHTML=html;
+      try{ if(lastTrans){ const m=html.match(/font-weight:600">([^<]*)</); if(m)lastTrans.out=m[1]; } }catch(e){}
+      box.appendChild(reportBtn());
       if(copyTarget) box.appendChild(copyBtn(copyTarget));
     }catch(e){
       const gl=`https://translate.google.com/?sl=${src}&tl=${dst}&text=${encodeURIComponent(q)}`;
@@ -785,6 +835,33 @@ async function geminiOcr(file,key){
   const t=c&&c.content&&c.content.parts&&c.content.parts.map(p=>p.text||"").join("");
   return (t||"").trim();
 }
+/* ---------- traduction de phrases par IA (Gemini), ancrée sur le dictionnaire ---------- */
+function transHints(q,src){
+  const words=q.toLowerCase().split(/[^a-zà-ÿа-яёӏ-]+/i).filter(w=>w.length>1&&!isStop(w,src));
+  const hints=[],seen=new Set();
+  for(const w of words){
+    if(seen.has(w)) continue;
+    const refs=dedupe(lookup(w,src).exact).slice(0,1);
+    if(refs.length){ const d=refData(refs[0]); if(d.ce){ seen.add(w); hints.push(w+" = "+d.ce); } }
+  }
+  return hints.slice(0,20);
+}
+async function geminiTranslate(q,src,dst,key){
+  const L={fr:"français",ce:"tchétchène (нохчийн мотт, alphabet cyrillique)",ru:"russe",en:"anglais"};
+  const model=(window.NM_OCR_MODEL||"gemini-2.5-flash");
+  const hints=transHints(q,src);
+  let prompt="Tu es un traducteur expert du tchétchène. Traduis du "+L[src]+" vers le "+L[dst]+" la phrase suivante, de manière naturelle et grammaticalement correcte.";
+  if(dst==="ce") prompt+=" Écris la traduction en tchétchène (alphabet cyrillique), en tenant compte des classes nominales et de l'ergativité.";
+  if(hints.length) prompt+=" Lexique vérifié à privilégier si pertinent : "+hints.join(" ; ")+".";
+  prompt+=" Réponds UNIQUEMENT par la traduction, sans guillemets ni explication.\n\nPhrase : "+q;
+  const body={contents:[{parts:[{text:prompt}]}],generationConfig:{temperature:0.2}};
+  const resp=await fetch("https://generativelanguage.googleapis.com/v1beta/models/"+model+":generateContent?key="+encodeURIComponent(key),
+    {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+  const j=await resp.json();
+  if(j.error) throw new Error(j.error.message||"Gemini");
+  const c=j.candidates&&j.candidates[0];
+  return ((c&&c.content&&c.content.parts||[]).map(p=>p.text||"").join("")||"").trim();
+}
 /* ---------- assistance dictionnaire : corrige les mots à 1 lettre près (candidat unique) ---------- */
 let CE_SET=null,RU_SET=null,DEL_IDX=null;
 function buildLexSets(){
@@ -976,7 +1053,7 @@ const I18N={
   mtLong:"Texte long : seuls les 1 800 premiers caractères ont été traduits.",
   mtOffline:"Service en ligne inaccessible (hors ligne ou accès bloqué).",mtOpen:"Ouvrir dans Google Translate ↗",
   mtDirect:"directe",mtPivot:"pivot russe",
-  badgeMT:"MT en ligne",badgeManual:"Manuel",badgeDict:"dictionnaire",badgeWord:"MT mot isolé",
+  badgeMT:"MT en ligne",badgeAI:"IA",reportBtn:"⚠ Mauvaise traduction",reportAsk:"Quelle serait la bonne traduction ? (facultatif)",reportOk:"Merci ! Votre signalement a été envoyé.",reportErr:"Envoi impossible pour le moment. Réessayez plus tard.",reportSending:"Envoi…",badgeManual:"Manuel",badgeDict:"dictionnaire",badgeWord:"MT mot isolé",
   noRes:"Aucun résultat dans le dictionnaire. Essayez la traduction en ligne ou une autre orthographe (ӏ / 1, аь…).",
   noRes2:"Aucun résultat.",variantOf:"variante de",
   impReading:"Lecture de",impPrep:"Préparation de l'image…",
@@ -987,11 +1064,12 @@ const I18N={
   install:"Installer",copy:"Copier",copied:"Copié !",adapted1p:"adapté à la 1re personne (« je ») — ву pour un homme, ю pour une femme",badgeRule:"règle",histT:"Historique",histEmpty:"Aucun historique pour l\u2019instant.",histClear:"Effacer",ocrLow:"confiance faible : une photo droite, nette et bien éclairée d\u2019un texte imprimé donnera un bien meilleur résultat.",
   lblHand:"écriture manuscrite",advOpts:"Options",visNoKey:"L\u2019écriture manuscrite nécessite une clé Google Vision (gratuite, 1\u00a0000 images/mois). Créez-la sur console.cloud.google.com (API Vision \u2192 Identifiants \u2192 Clé API), puis collez-la ci-dessus : elle reste sur cet appareil.",
   fixedN:"{n} mot(s) corrigé(s) via le dictionnaire",langDet:"langue détectée",ocrAdv:"transcription améliorée (OCR avancé)",ocrLimit:"Limite atteinte.",ocrRetry:"Transcription incorrecte ? OCR avancé",ocrRetryHint:"Pour l\u2019écriture manuscrite ou les scans difficiles. {n} essai(s) restant(s) pour cette session.",ocrAdvRun:"OCR avancé en cours…",installHow:"Pour installer l\u2019application :\niPhone/iPad : Safari \u2192 bouton Partager \u2192 \u00ab Sur l\u2019\u00e9cran d\u2019accueil \u00bb.\nAndroid/PC : menu du navigateur \u2192 \u00ab Installer l\u2019application \u00bb.",
-  aboutHtml:`<h2>Noxchiyn Mott — Нохчийн мотт</h2>
-   <p>Dictionnaire et traducteur pour la langue tchétchène, construit à partir de sources publiées et vérifiables. Chaque résultat affiche sa source :</p>
-   <p><span class="badge b-high">dictionnaire</span> dictionnaires publiés (Wiktionary, Matsiev…) · <span class="badge b-mid">Manuel</span> méthodes de langue · <span class="badge b-low">MT en ligne</span> traduction automatique, à vérifier.</p>
-   <p>Sources : Wiktionnaires anglais et russe (kaikki.org, CC BY-SA) · dictionnaire tchétchène-russe de Matsiev, dictionnaire d'anatomie Bersanov et vocabulaire BaltoSlav (corpus ouvert arXiv:2507.12672) · ressources pédagogiques (tchetchene.free.fr, Waynakh Online, LIMBA) · grammaire d'après J. Nichols et le CNRS-LGIDF.</p>
-   <p class="hint">Dictionnaire disponible hors ligne · installable sur téléphone (PWA).</p>`},
+  aboutHtml:`<h2>Нохчийн мотт — Noxchiyn Mott</h2>
+   <p>This is a translator for the Chechen language. It was built with the help of artificial intelligence, based on many free and open-source documents and dictionaries found online.</p>
+   <p>Resources are still limited, so translations can sometimes be imperfect and mistakes may slip in. <b>We need your help to improve it.</b></p>
+   <p>Whenever you see a bad translation, click the <b>"⚠ Bad translation"</b> button below the result: it sends us a short report so we can fix it.</p>
+   <p>And if you have any texts — books, novels, summaries, poems, songs, or any document (PDF or other) — <a href="mailto:{MAIL}?subject=Noxchiyn%20Mott">send them to us ✉</a>. Together, let's improve and preserve the Chechen language.</p>
+   <p class="hint">Sources: Wiktionaries (kaikki.org), Matsiev dictionary and open corpora (arXiv:2507.12672), learning resources. AI-assisted translation and OCR. Dictionary available offline.</p>`},
  ru:{trad:"Переводчик",dico:"Словарь",phrases:"Выражения",nombres:"Числа",gram:"Грамматика","import":"Импорт",apropos:"О программе",
   btnTrad:"Перевести",mt:"Онлайн-перевод (Google) для фраз",
   phTrad:"Слово или фраза…",phDico:"Поиск слова (fr, ce, ru, en)… напр. волк, борз",
@@ -1009,7 +1087,7 @@ const I18N={
   mtLong:"Длинный текст: переведены только первые 1 800 знаков.",
   mtOffline:"Онлайн-сервис недоступен (нет сети или доступ заблокирован).",mtOpen:"Открыть в Google Translate ↗",
   mtDirect:"прямой",mtPivot:"через русский",
-  badgeMT:"онлайн-МП",badgeManual:"Учебник",badgeDict:"словарь",badgeWord:"МП (слово)",
+  badgeMT:"онлайн-МП",badgeAI:"ИИ",reportBtn:"⚠ Плохой перевод",reportAsk:"Какой был бы правильный перевод? (необязательно)",reportOk:"Спасибо! Ваше сообщение отправлено.",reportErr:"Не удалось отправить. Попробуйте позже.",reportSending:"Отправка…",badgeManual:"Учебник",badgeDict:"словарь",badgeWord:"МП (слово)",
   noRes:"В словаре ничего не найдено. Попробуйте онлайн-перевод или другое написание (ӏ / 1, аь…).",
   noRes2:"Ничего не найдено.",variantOf:"вариант слова",
   impReading:"Чтение",impPrep:"Подготовка изображения…",
@@ -1042,7 +1120,7 @@ const I18N={
   mtLong:"Long text: only the first 1,800 characters were translated.",
   mtOffline:"Online service unreachable (offline or blocked).",mtOpen:"Open in Google Translate ↗",
   mtDirect:"direct",mtPivot:"Russian pivot",
-  badgeMT:"online MT",badgeManual:"Textbook",badgeDict:"dictionary",badgeWord:"MT (word)",
+  badgeMT:"online MT",badgeAI:"AI",reportBtn:"⚠ Bad translation",reportAsk:"What would be the correct translation? (optional)",reportOk:"Thanks! Your report was sent.",reportErr:"Could not send right now. Please try again later.",reportSending:"Sending…",badgeManual:"Textbook",badgeDict:"dictionary",badgeWord:"MT (word)",
   noRes:"No dictionary result. Try online translation or another spelling (ӏ / 1, аь…).",
   noRes2:"No results.",variantOf:"variant of",
   impReading:"Reading",impPrep:"Preparing image…",
@@ -1096,7 +1174,7 @@ function applyLang(l){
   if(typeof renderPhrases==="function") renderPhrases();
   if(typeof renderNumTable==="function") renderNumTable();
   if(typeof renderGram==="function") renderGram();
-  const ab=$("about-out"); if(ab) ab.innerHTML=T("aboutHtml");
+  const ab=$("about-out"); if(ab) ab.innerHTML=T("aboutHtml").replace(/{MAIL}/g,(window.NM_REPORT_EMAIL||""));
 }
 (function(){
   const sel=$("ui-lang"); if(!sel) return;
@@ -1211,7 +1289,7 @@ histWire("btn-hist-d","hist-d","nm_h_dico",it=>{
 })();
 
 /* ---------- version visible (diagnostic cache) ---------- */
-(function(){const v=document.getElementById("ver");if(v)v.textContent="· v37";})();
+(function(){const v=document.getElementById("ver");if(v)v.textContent="· v39";})();
 
 /* ---------- PWA ---------- */
 if("serviceWorker" in navigator && location.protocol.startsWith("http")){

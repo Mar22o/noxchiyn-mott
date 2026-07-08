@@ -1,15 +1,17 @@
 // ===================================================================
-//  Cle Google Gemini — OCR de l'ecriture manuscrite par IA (pour tous les visiteurs).
+//  Cle Google Gemini — OCR manuscrit ET traduction de phrases par IA.
 //
 //  La cle est publique dans le code : protegez-la cote Google par
 //    1) une restriction de site : noxchiynmott.com/*
-//    2) une API autorisee : "Generative Language API"
+//    2) l'API "Generative Language API" activee
 //    3) un plafond de depense (alerte de budget)
-//  L'app limite en plus a 15 OCR avances par session.
 //
-//  >>> Collez votre cle entre les guillemets ci-dessous, puis televersez ce fichier. <<<
+//  >>> Collez votre cle Gemini (AI Studio) entre les guillemets, puis televersez. <<<
 // ===================================================================
-window.NM_AI_KEY = "AIzaSyC7952IAWqqxOdtHZP5HrEbxHyYQ09PTlA";
+window.NM_AI_KEY = "";
 
 // Modele IA (laisser tel quel ; a changer seulement si Google le renomme un jour)
 window.NM_OCR_MODEL = "gemini-2.5-flash";
+
+// Adresse qui recoit les signalements de "mauvaise traduction"
+window.NM_REPORT_EMAIL = "mar22o@proton.me";
