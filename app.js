@@ -776,6 +776,28 @@ async function visionOcr(file,key){
   if(r0.error) throw new Error(r0.error.message||"Vision");
   return (r0.fullTextAnnotation&&r0.fullTextAnnotation.text)||"";
 }
+/* ---------- OCR par IA (Gemini) : comprend le tchétchène, bien meilleur sur le manuscrit ---------- */
+async function fileToB64(file){
+  return new Promise((res,rej)=>{const r=new FileReader();
+    r.onload=()=>res(String(r.result).split(",")[1]); r.onerror=rej; r.readAsDataURL(file);});
+}
+async function geminiOcr(file,key){
+  const model=(window.NM_OCR_MODEL||"gemini-2.5-flash");
+  const b64=await fileToB64(file);
+  const prompt="Transcris fidelement, caractere par caractere, le texte manuscrit de cette image. "
+    +"Le texte est en tchetchene (alphabet cyrillique, avec la lettre palotchka \u0406/\u04cf), et parfois en russe ou en anglais. "
+    +"Respecte les sauts de ligne. Corrige uniquement les erreurs de lecture evidentes d'apres le sens. "
+    +"Ne traduis rien. Ne mets aucun commentaire ni explication : reponds uniquement par le texte transcrit.";
+  const body={contents:[{parts:[{text:prompt},{inline_data:{mime_type:(file.type||"image/jpeg"),data:b64}}]}],
+    generationConfig:{temperature:0}};
+  const resp=await fetch("https://generativelanguage.googleapis.com/v1beta/models/"+model+":generateContent?key="+encodeURIComponent(key),
+    {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+  const j=await resp.json();
+  if(j.error) throw new Error(j.error.message||"Gemini");
+  const c=j.candidates&&j.candidates[0];
+  const t=c&&c.content&&c.content.parts&&c.content.parts.map(p=>p.text||"").join("");
+  return (t||"").trim();
+}
 /* ---------- assistance dictionnaire : corrige les mots à 1 lettre près (candidat unique) ---------- */
 let CE_SET=null,RU_SET=null,DEL_IDX=null;
 function buildLexSets(){
@@ -854,7 +876,9 @@ async function runAdvanced(){
   const key=visionKey(); if(!key) return;
   const box=$("imp-retry"); box.innerHTML=`<p class="hint">${T("ocrAdvRun")}</p>`;
   try{
-    const vt=await visionOcr(lastImageFile,key);
+    let vt="";
+    try{ vt=await geminiOcr(lastImageFile,key); }           // IA : comprend le tchétchène
+    catch(e1){ vt=await visionOcr(lastImageFile,key); }     // secours : OCR classique
     visSession++;
     $("imp-text").value=finishText(vt);
     let msg=T("ocrAdv");
@@ -1214,7 +1238,7 @@ histWire("btn-hist-d","hist-d","nm_h_dico",it=>{
 })();
 
 /* ---------- version visible (diagnostic cache) ---------- */
-(function(){const v=document.getElementById("ver");if(v)v.textContent="· v35";})();
+(function(){const v=document.getElementById("ver");if(v)v.textContent="· v36";})();
 
 /* ---------- PWA ---------- */
 if("serviceWorker" in navigator && location.protocol.startsWith("http")){
