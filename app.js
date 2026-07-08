@@ -759,23 +759,10 @@ async function ocrImage(src,lang){
   lastOcrConf=Math.round(best.data.confidence);
   return best.data.text;
 }
-/* ---------- OCR manuscrit : Google Cloud Vision (le meilleur pour la cursive cyrillique) ---------- */
+/* ---------- OCR manuscrit par IA (Gemini) ---------- */
 const VIS_SESSION_MAX=15;         // OCR manuscrits maximum par session (remis à 0 au rechargement)
 let visSession=0, lastImageFile=null;
-function visionKey(){ try{ return (window.NM_VISION_KEY||"") || localStorage.getItem("nm_viskey") || ""; }catch(e){ return window.NM_VISION_KEY||""; } }
-async function visionOcr(file,key){
-  const b64=await new Promise((res,rej)=>{const r=new FileReader();
-    r.onload=()=>res(String(r.result).split(",")[1]); r.onerror=rej; r.readAsDataURL(file);});
-  const body={requests:[{image:{content:b64},
-    features:[{type:"DOCUMENT_TEXT_DETECTION"}],imageContext:{languageHints:["ru"]}}]};
-  const resp=await fetch("https://vision.googleapis.com/v1/images:annotate?key="+encodeURIComponent(key),
-    {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
-  const j=await resp.json();
-  const r0=(j.responses&&j.responses[0])||{};
-  if(j.error) throw new Error(j.error.message||"Vision");
-  if(r0.error) throw new Error(r0.error.message||"Vision");
-  return (r0.fullTextAnnotation&&r0.fullTextAnnotation.text)||"";
-}
+function aiKey(){ return (window.NM_AI_KEY||""); }
 /* ---------- OCR par IA (Gemini) : comprend le tchétchène, bien meilleur sur le manuscrit ---------- */
 async function fileToB64(file){
   return new Promise((res,rej)=>{const r=new FileReader();
@@ -865,7 +852,7 @@ function finishText(text){
 // bouton « OCR avancé » (manuscrit) — affiché après l'OCR gratuit, à la demande de l'utilisateur
 function renderRetry(){
   const box=$("imp-retry"); if(!box) return;
-  if(!lastImageFile||!visionKey()){ box.innerHTML=""; return; }
+  if(!lastImageFile||!aiKey()){ box.innerHTML=""; return; }
   if(visSession>=VIS_SESSION_MAX){ box.innerHTML=`<p class="hint">${T("ocrLimit")}</p>`; return; }
   box.innerHTML=`<button id="imp-adv-btn" class="copy-btn">🔍 ${T("ocrRetry")}</button>`
     +`<p class="hint">${T("ocrRetryHint").replace("{n}",VIS_SESSION_MAX-visSession)}</p>`;
@@ -873,12 +860,10 @@ function renderRetry(){
 }
 async function runAdvanced(){
   if(!lastImageFile||visSession>=VIS_SESSION_MAX) return;
-  const key=visionKey(); if(!key) return;
+  const key=aiKey(); if(!key) return;
   const box=$("imp-retry"); box.innerHTML=`<p class="hint">${T("ocrAdvRun")}</p>`;
   try{
-    let vt="";
-    try{ vt=await geminiOcr(lastImageFile,key); }           // IA : comprend le tchétchène
-    catch(e1){ vt=await visionOcr(lastImageFile,key); }     // secours : OCR classique
+    const vt=await geminiOcr(lastImageFile,key);   // IA qui comprend le tchétchène
     visSession++;
     $("imp-text").value=finishText(vt);
     let msg=T("ocrAdv");
@@ -970,18 +955,6 @@ async function handleFile(file){
   });
 })();
 
-/* reglage prive de la cle OCR (cache) : ...?k=VOTRECLE */
-(function(){
-  try{
-    var u=new URL(location.href), k=u.searchParams.get("k");
-    if(k!==null){
-      if(k) localStorage.setItem("nm_viskey",k); else localStorage.removeItem("nm_viskey");
-      u.searchParams.delete("k");
-      history.replaceState(null,"",u.pathname+u.search+u.hash);
-      alert(k?"Cle OCR manuscrit enregistree sur cet appareil.":"Cle OCR supprimee.");
-    }
-  }catch(e){}
-})();
 
 /* ---------- langue de l'interface ---------- */
 let CURLANG="fr";
@@ -1238,7 +1211,7 @@ histWire("btn-hist-d","hist-d","nm_h_dico",it=>{
 })();
 
 /* ---------- version visible (diagnostic cache) ---------- */
-(function(){const v=document.getElementById("ver");if(v)v.textContent="· v36";})();
+(function(){const v=document.getElementById("ver");if(v)v.textContent="· v37";})();
 
 /* ---------- PWA ---------- */
 if("serviceWorker" in navigator && location.protocol.startsWith("http")){
