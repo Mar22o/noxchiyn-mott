@@ -247,6 +247,8 @@ async function fixLeaksOnline(ana){
 
 /* ---------- signalement de mauvaise traduction ---------- */
 let lastTrans=null;
+const NM_DEBUG=/[?&]debug=1/.test(location.search);
+let aiErr="";
 async function sendReport(payload){
   const email=(window.NM_REPORT_EMAIL||"");
   if(!email) throw new Error("no-email");
@@ -482,9 +484,11 @@ async function doTranslate(){
     box.innerHTML=`<p class="hint">${T("mtQuery")}</p>`;
     out.appendChild(box);
     const aik=aiKey();
+    aiErr = aik ? "" : "aucune cle configuree";
     if(aik){
       try{
         const gt=await geminiTranslate(q.slice(0,2000),src,dst,aik);
+        if(!gt) aiErr="reponse vide";
         if(gt){
           box.className="card";
           let h=`<p class="ce" style="font-size:1.2rem;font-weight:600;margin-top:0">${esc(gt)}</p>`;
@@ -492,7 +496,7 @@ async function doTranslate(){
           box.innerHTML=h; box.appendChild(copyBtn(gt)); if(lastTrans)lastTrans.out=gt; box.appendChild(reportBtn());
           return;
         }
-      }catch(e){ /* repli sur Google Translate */ }
+      }catch(e){ aiErr=(e&&e.message)||String(e); }
     }
     const qmt=q.length>1800?q.slice(0,1800):q; // limite de l'API
     try{
@@ -520,6 +524,7 @@ async function doTranslate(){
         html+=`<p style="font-size:1.2rem;font-weight:600;margin-top:0">${esc(main)}</p>
           ${isCyr(main)?`<p class="lat">${esc(translit(main))}</p>`:""}`;
       }
+      if(NM_DEBUG&&aiErr) html='<p class="hint" style="color:#d05e57;margin-top:0"><b>IA indisponible :</b> '+esc(aiErr)+'</p>'+html;
       box.innerHTML=html;
       try{ if(lastTrans){ const m=html.match(/font-weight:600">([^<]*)</); if(m)lastTrans.out=m[1]; } }catch(e){}
       box.appendChild(reportBtn());
@@ -1303,7 +1308,7 @@ histWire("btn-hist-d","hist-d","nm_h_dico",it=>{
 })();
 
 /* ---------- version visible (diagnostic cache) ---------- */
-(function(){const v=document.getElementById("ver");if(v)v.textContent="· v41";})();
+(function(){const v=document.getElementById("ver");if(v)v.textContent="· v42";})();
 
 /* ---------- PWA ---------- */
 if("serviceWorker" in navigator && location.protocol.startsWith("http")){
