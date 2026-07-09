@@ -80,15 +80,27 @@ const STOP_RU=new Set("и в на не с к у о а же бы ли что ка
 function isStop(w,lang){const x=normFr(w);
   return lang==="fr"?STOP_FR.has(x):lang==="en"?STOP_EN.has(x):lang==="ru"?STOP_RU.has(x):false;}
 
+/* ---------- classes nominales (в/й/б/д) ---------- */
+// code Wiktionary : 1re lettre = classe du singulier, 2e = classe du pluriel
+const CLS_LET={v:{p:"в-",c:"ву"},j:{p:"й-",c:"ю"},b:{p:"б-",c:"бу"},d:{p:"д-",c:"ду"}};
+function classInfo(k){
+  if(!k) return null;
+  const s=String(k).toLowerCase();
+  const m=s.match(/^([vjbd])/); if(!m) return null;
+  const sg=CLS_LET[m[1]];
+  const p=s.match(/^[vjbd]([vjbd])/);
+  return {sg:sg, pl:p?CLS_LET[p[1]]:null, code:s};
+}
+
 const SRC_LBL={"tchetchene.free.fr":"tchetchene.free.fr","waynakh":"Waynakh","ling073":"LING073",
   "ruwikt":"Wiktionary (ru)","diasporaTR":"diaspora TR"};
 function refData(ref){
   if(ref.t==="w"){ const e=W[ref.i];
-    return {ce:e.c,fr:e.f||"",en:e.e||"",ru:e.r||"",tr:e.t||"",pos:POS_FR[e.p]||e.p,
+    return {ce:e.c,fr:e.f||"",en:e.e||"",ru:e.r||"",tr:e.t||"",cls_n:e.k||"",pos:POS_FR[e.p]||e.p,
       src:e.s?(SRC_LBL[e.s]||e.s):"Wiktionary",
       cls:(!e.s||e.s==="ruwikt")?"b-high":"b-mid",v:e.v}; }
   const e=R[ref.i];
-  return {ce:e.c,fr:"",en:"",ru:e.r,tr:"",pos:"",src:e.s||"Matsiev",cls:"b-high"};
+  return {ce:e.c,fr:"",en:"",ru:e.r,tr:"",cls_n:e.k||"",pos:"",src:e.s||"Matsiev",cls:"b-high"};
 }
 function entryHtml(d,dst){
   let tr=[];
@@ -101,8 +113,7 @@ function entryHtml(d,dst){
   return `<div class="entry"><span class="ce">${esc(d.ce)}</span>
     <span class="lat">${esc(translit(d.ce))}</span>
     ${d.pos?`<span class="pos">${esc(d.pos)}</span>`:""}
-    <span class="tr">${tr.join(" · ")}</span>
-    <span class="badge ${d.cls}" title="Source : ${esc(d.src)}">${esc(d.src)}</span></div>`;
+    <span class="tr">${tr.join(" · ")}</span></div>`;
 }
 function dedupe(refs){
   const seen=new Set(), out=[];
@@ -129,7 +140,8 @@ function renderGrouped(refs,dst){
       if(d.en&&(dst==="en"||!d.fr)) tr.push(esc(d.en));
       if(d.tr) tr.push("tr : "+esc(d.tr));
       if(d.v) tr.push(`<span class="lat">${T("variantOf")} ${esc(d.v)}</span>`);
-      html+=`<div class="sense">${d.pos?`<span class="pos">${esc(d.pos)}</span> `:""}${tr.join(" · ")} <span class="badge ${d.cls}" title="Source">${esc(d.src)}</span></div>`;
+      const ci=classInfo(d.cls_n);
+      html+=`<div class="sense">${d.pos?`<span class="pos">${esc(d.pos)}</span> `:""}${ci?`<span class="pos">cl. ${esc(ci.sg.p)}</span> `:""}${tr.join(" · ")}</div>`;
     }
     html+=`</div></div>`;
   }
@@ -386,7 +398,7 @@ async function doTranslate(){
   const ph=phraseMatches(q,src==="ce"?"ce":"fr");
   if(ph.length){
     html+=`<div class="card"><h2>${T("cardExpr")}</h2>`+
-      ph.map(p=>`<div class="entry"><span class="ce">${esc(p.ce)}</span><span class="lat">${esc(translit(p.ce))}</span><span class="tr">${esc(p.fr)}</span><span class="badge b-mid">${T("badgeManual")}</span></div>`).join("")+`</div>`;
+      ph.map(p=>`<div class="entry"><span class="ce">${esc(p.ce)}</span><span class="lat">${esc(translit(p.ce))}</span><span class="tr">${esc(p.fr)}</span></div>`).join("")+`</div>`;
   }
   // 2. dictionnaire (requête entière) — sens multiples groupés par mot tchétchène
   const refs=dictSection(q,src,dst);
@@ -405,7 +417,7 @@ async function doTranslate(){
     }
     if(rows) html+=`<div class="card"><h2>${T("cardWbw")}</h2>${rows}</div>`;
   }
-  if(!html&&!$("use-mt").checked){
+  if(!html&&!true){
     html=`<div class="empty">${T("noRes")}</div>`;
   }
   out.innerHTML=html;
@@ -416,7 +428,7 @@ async function doTranslate(){
     const rb=document.createElement("div"); rb.className="card"; rb.style.textAlign="right"; rb.style.padding="8px 14px";
     rb.appendChild(reportBtn()); out.appendChild(rb);
   }
-  if($("use-mt").checked&&dst==="ce"&&(src==="fr"||src==="en")&&words.length>1&&words.length<=8){
+  if(true&&dst==="ce"&&(src==="fr"||src==="en")&&words.length>1&&words.length<=8){
     try{
       const ruQ=(await gtx(src,"ru",q.slice(0,300))).toLowerCase().replace(/[.!?…]+$/,"").trim();
       let er=lookup(ruQ,"ru");
@@ -451,7 +463,7 @@ async function doTranslate(){
           if(/^хьо\s/i.test(e.c)){
             const g=e.c.replace(/^хьо/i,"со").replace(/[!?]+$/,"");
             if(seen.has(g)) continue; seen.add(g);
-            adapted+=`<div class="entry"><span class="ce">${esc(g)}</span><span class="lat">${esc(translit(g))}</span><span class="tr">${T("adapted1p")}</span><span class="badge b-mid">${T("badgeRule")}</span></div>`;
+            adapted+=`<div class="entry"><span class="ce">${esc(g)}</span><span class="lat">${esc(translit(g))}</span><span class="tr">${T("adapted1p")}</span></div>`;
           }
         }
       }
@@ -464,10 +476,10 @@ async function doTranslate(){
     }catch(e){}
   }
   // 4. traduction automatique en ligne (phrases ou si rien trouvé)
-  if($("use-mt").checked&&(words.length>1||!refs.length)){
+  if(true&&(words.length>1||!refs.length)){
     const box=document.createElement("div");
-    box.className="card mt-box";
-    box.innerHTML=`<h2>${T("cardMT")}</h2><p class="hint">${T("mtQuery")}</p>`;
+    box.className="card";
+    box.innerHTML=`<p class="hint">${T("mtQuery")}</p>`;
     out.appendChild(box);
     const aik=aiKey();
     if(aik){
@@ -475,8 +487,7 @@ async function doTranslate(){
         const gt=await geminiTranslate(q.slice(0,2000),src,dst,aik);
         if(gt){
           box.className="card";
-          let h=`<h2>${T("cardMT")} <span class="badge b-mid">${T("badgeAI")}</span></h2>`
-            +`<p class="ce" style="font-size:1.15rem;font-weight:600">${esc(gt)}</p>`;
+          let h=`<p class="ce" style="font-size:1.2rem;font-weight:600;margin-top:0">${esc(gt)}</p>`;
           if(isCyr(gt)) h+=`<p class="lat">${esc(translit(gt))}</p>`;
           box.innerHTML=h; box.appendChild(copyBtn(gt)); if(lastTrans)lastTrans.out=gt; box.appendChild(reportBtn());
           return;
@@ -492,7 +503,7 @@ async function doTranslate(){
       }
       if(!direct&&!pivot) throw new Error("aucune réponse");
       let copyTarget="";
-      let html=`<h2>${T("cardMT")} <span class="badge b-low">${T("badgeMT")}</span></h2>`;
+      let html="";
       if(dst==="ce"){
         const cands=[[T("mtDirect"),direct],[T("mtPivot"),pivot]].filter(c=>c[1])
           .map(([n,t])=>[n,t,analyzeCe(t)]);
@@ -501,33 +512,21 @@ async function doTranslate(){
         const [name,raw,anaRaw]=cands[0];
         const ana=await fixLeaksOnline(anaRaw);
         copyTarget=ana.text;
-        html+=`<p class="ce" style="font-size:1.15rem;font-weight:600">${esc(ana.text)}</p>
+        html+=`<p class="ce" style="font-size:1.2rem;font-weight:600;margin-top:0">${esc(ana.text)}</p>
           <p class="lat">${esc(translit(ana.text))}</p>`;
-        if(ana.subs.length){
-          html+=`<p class="hint">${T("mtSubs")}`
-            +ana.subs.map(s=>`<b>${esc(s.ru)}</b> → <span class="ce">${esc(s.ce)}</span> <span class="badge ${s.src==="MT mot"?"b-low":"b-high"}">${s.src==="MT mot"?T("badgeWord"):T("badgeDict")}</span>`).join(" · ")
-            +`</p><p class="hint">${T("mtRaw")} (${name}) : ${esc(raw)}</p>`;
-        }
-        if(cands.length>1&&cands[1][2].text!==ana.text){
-          html+=`<p class="hint">${T("mtOther")} (${cands[1][0]}) : <span class="ce">${esc(cands[1][2].text)}</span></p>`;
-        }
       }else{
         const main=direct||pivot;
         copyTarget=main;
-        html+=`<p style="font-size:1.1rem;font-weight:600">${esc(main)}</p>
+        html+=`<p style="font-size:1.2rem;font-weight:600;margin-top:0">${esc(main)}</p>
           ${isCyr(main)?`<p class="lat">${esc(translit(main))}</p>`:""}`;
-        if(pivot&&direct&&pivot!==direct) html+=`<p class="hint">${T("viaRu")} : ${esc(pivot)}</p>`;
       }
-      if(q.length>1800) html+=`<p class="hint">${T("mtLong")}</p>`;
-      html+=`<p class="warn">${T("mtWarn")}</p>`;
       box.innerHTML=html;
       try{ if(lastTrans){ const m=html.match(/font-weight:600">([^<]*)</); if(m)lastTrans.out=m[1]; } }catch(e){}
       box.appendChild(reportBtn());
       if(copyTarget) box.appendChild(copyBtn(copyTarget));
     }catch(e){
       const gl=`https://translate.google.com/?sl=${src}&tl=${dst}&text=${encodeURIComponent(q)}`;
-      box.innerHTML=`<h2>${T("cardMT")}</h2>
-        <p class="hint">${T("mtOffline")}
+      box.innerHTML=`<p class="hint">${T("mtOffline")}
         <a href="${gl}" target="_blank" rel="noopener noreferrer">${T("mtOpen")}</a></p>`;
     }
   }
@@ -559,7 +558,7 @@ $("dico-q").addEventListener("input",()=>{
 
 /* ---------- expressions ---------- */
 function phraseRow(p){
-  return `<div class="entry"><span class="ce">${esc(p.ce)}</span><span class="lat">${esc(translit(p.ce))}</span><span class="tr">${esc(p.fr)}</span><span class="badge b-mid">${T("badgeManual")}</span></div>`;
+  return `<div class="entry"><span class="ce">${esc(p.ce)}</span><span class="lat">${esc(translit(p.ce))}</span><span class="tr">${esc(p.fr)}</span></div>`;
 }
 function renderPhrases(){
   const cats=[...new Set(NM_PHRASES.map(p=>p.cat))];
@@ -841,8 +840,15 @@ function transHints(q,src){
   const hints=[],seen=new Set();
   for(const w of words){
     if(seen.has(w)) continue;
-    const refs=dedupe(lookup(w,src).exact).slice(0,1);
-    if(refs.length){ const d=refData(refs[0]); if(d.ce){ seen.add(w); hints.push(w+" = "+d.ce); } }
+    const refs=dedupe(lookup(w,src).exact).slice(0,3);
+    for(const r of refs){
+      const d=refData(r);
+      if(!d.ce) continue;
+      seen.add(w);
+      const ci=classInfo(d.cls_n);
+      hints.push(w+" = "+d.ce+(ci?" [classe "+ci.sg.p+", copule «"+ci.sg.c+"»"+(ci.pl?", pluriel "+ci.pl.p:"")+"]":""));
+      break;
+    }
   }
   return hints.slice(0,20);
 }
@@ -851,8 +857,14 @@ async function geminiTranslate(q,src,dst,key){
   const model=(window.NM_OCR_MODEL||"gemini-2.5-flash");
   const hints=transHints(q,src);
   let prompt="Tu es un traducteur expert du tchétchène. Traduis du "+L[src]+" vers le "+L[dst]+" la phrase suivante, de manière naturelle et grammaticalement correcte.";
-  if(dst==="ce") prompt+=" Écris la traduction en tchétchène (alphabet cyrillique), en tenant compte des classes nominales et de l'ergativité.";
-  if(hints.length) prompt+=" Lexique vérifié à privilégier si pertinent : "+hints.join(" ; ")+".";
+  if(dst==="ce"){
+    prompt+=" Écris la traduction en tchétchène (alphabet cyrillique).";
+    prompt+=" RÈGLES GRAMMATICALES IMPÉRATIVES : (1) le tchétchène est ergatif — le sujet d'un verbe transitif prend l'ergatif (со → ас, хьо → ахь).";
+    prompt+=" (2) Le verbe et la copule s'accordent en CLASSE avec l'ABSOLUTIF (l'objet d'un verbe transitif, le sujet d'un intransitif) :";
+    prompt+=" classe в- → « ву », classe й- → « ю », classe б- → « бу », classe д- → « ду » ; de même les verbes à préfixe de classe (в/й/б/д).";
+    prompt+=" Respecte scrupuleusement la classe indiquée entre crochets dans le lexique ci-dessous.";
+  }
+  if(hints.length) prompt+=" Lexique vérifié (à utiliser tel quel) : "+hints.join(" ; ")+".";
   prompt+=" Réponds UNIQUEMENT par la traduction, sans guillemets ni explication.\n\nPhrase : "+q;
   const body={contents:[{parts:[{text:prompt}]}],generationConfig:{temperature:0.2}};
   const resp=await fetch("https://generativelanguage.googleapis.com/v1beta/models/"+model+":generateContent?key="+encodeURIComponent(key),
@@ -1065,11 +1077,11 @@ const I18N={
   lblHand:"écriture manuscrite",advOpts:"Options",visNoKey:"L\u2019écriture manuscrite nécessite une clé Google Vision (gratuite, 1\u00a0000 images/mois). Créez-la sur console.cloud.google.com (API Vision \u2192 Identifiants \u2192 Clé API), puis collez-la ci-dessus : elle reste sur cet appareil.",
   fixedN:"{n} mot(s) corrigé(s) via le dictionnaire",langDet:"langue détectée",ocrAdv:"transcription améliorée (OCR avancé)",ocrLimit:"Limite atteinte.",ocrRetry:"Transcription incorrecte ? OCR avancé",ocrRetryHint:"Pour l\u2019écriture manuscrite ou les scans difficiles. {n} essai(s) restant(s) pour cette session.",ocrAdvRun:"OCR avancé en cours…",installHow:"Pour installer l\u2019application :\niPhone/iPad : Safari \u2192 bouton Partager \u2192 \u00ab Sur l\u2019\u00e9cran d\u2019accueil \u00bb.\nAndroid/PC : menu du navigateur \u2192 \u00ab Installer l\u2019application \u00bb.",
   aboutHtml:`<h2>Нохчийн мотт — Noxchiyn Mott</h2>
-   <p>This is a translator for the Chechen language. It was built with the help of artificial intelligence, based on many free and open-source documents and dictionaries found online.</p>
-   <p>Resources are still limited, so translations can sometimes be imperfect and mistakes may slip in. <b>We need your help to improve it.</b></p>
-   <p>Whenever you see a bad translation, click the <b>"⚠ Bad translation"</b> button below the result: it sends us a short report so we can fix it.</p>
-   <p>And if you have any texts — books, novels, summaries, poems, songs, or any document (PDF or other) — <a href="mailto:{MAIL}?subject=Noxchiyn%20Mott">send them to us ✉</a>. Together, let's improve and preserve the Chechen language.</p>
-   <p class="hint">Sources: Wiktionaries (kaikki.org), Matsiev dictionary and open corpora (arXiv:2507.12672), learning resources. AI-assisted translation and OCR. Dictionary available offline.</p>`},
+   <p>Ceci est un traducteur pour la langue tchétchène. Il a été créé à l'aide de l'intelligence artificielle, en se basant sur de nombreux documents et dictionnaires libres et open source trouvés en ligne.</p>
+   <p>Les ressources restant limitées, la traduction peut parfois être imparfaite et des erreurs peuvent se glisser. <b>Nous avons besoin de votre aide pour l'améliorer.</b></p>
+   <p>Chaque fois que vous rencontrez une mauvaise traduction, cliquez sur le bouton « Mauvaise traduction » affiché sous le résultat : cela nous envoie un petit rapport, et nous pourrons corriger.</p>
+   <p>Et si vous avez des textes — livres, romans, résumés, poésies, chansons, ou tout autre document (PDF ou autre) — <a href="mailto:{MAIL}?subject=Noxchiyn%20Mott">envoyez-les-nous ✉</a>. Nous pourrons ainsi enrichir l'outil. Ensemble, perfectionnons et préservons la langue tchétchène.</p>
+   <p class="hint">Sources : Wiktionnaires (kaikki.org), dictionnaire Matsiev et corpus ouverts (arXiv:2507.12672), ressources pédagogiques. Dictionnaire disponible hors ligne · installable sur téléphone.</p>`},
  ru:{trad:"Переводчик",dico:"Словарь",phrases:"Выражения",nombres:"Числа",gram:"Грамматика","import":"Импорт",apropos:"О программе",
   btnTrad:"Перевести",mt:"Онлайн-перевод (Google) для фраз",
   phTrad:"Слово или фраза…",phDico:"Поиск слова (fr, ce, ru, en)… напр. волк, борз",
@@ -1098,11 +1110,12 @@ const I18N={
   install:"Установить",copy:"Копировать",copied:"Скопировано!",adapted1p:"адаптировано к 1-му лицу («я») — ву для мужчины, ю для женщины",badgeRule:"правило",histT:"История",histEmpty:"История пока пуста.",histClear:"Очистить",ocrLow:"низкая уверенность: прямое, чёткое и хорошо освещённое фото печатного текста даст куда лучший результат.",
   lblHand:"рукописный текст",advOpts:"Параметры",visNoKey:"Для рукописного текста нужен ключ Google Vision (бесплатно, 1\u00a0000 изображений/мес). Создайте его на console.cloud.google.com и вставьте выше: он хранится на этом устройстве.",
   fixedN:"{n} слов(а) исправлено по словарю",langDet:"обнаружен язык",ocrAdv:"распознавание улучшено (продвинутый OCR)",ocrLimit:"Лимит достигнут.",ocrRetry:"Плохо распознано? Продвинутый OCR",ocrRetryHint:"Для рукописного текста и сложных сканов. Осталось {n} попыт(ок) в этой сессии.",ocrAdvRun:"Продвинутый OCR…",installHow:"Установка приложения:\niPhone/iPad: Safari \u2192 Поделиться \u2192 \u00abНа экран \u00abДомой\u00bb\u00bb.\nAndroid/ПК: меню браузера \u2192 \u00abУстановить приложение\u00bb.",
-  aboutHtml:`<h2>Noxchiyn Mott — Нохчийн мотт</h2>
-   <p>Словарь и переводчик чеченского языка, построенный на опубликованных и проверяемых источниках. Каждый результат показывает свой источник:</p>
-   <p><span class="badge b-high">словарь</span> изданные словари (Wiktionary, Мациев…) · <span class="badge b-mid">Учебник</span> учебные пособия · <span class="badge b-low">онлайн-МП</span> машинный перевод, требует проверки.</p>
-   <p>Источники: английский и русский Викисловари (kaikki.org, CC BY-SA) · чеченско-русский словарь Мациева, анатомический словарь Берсанова, словарь BaltoSlav (открытый корпус arXiv:2507.12672) · учебные ресурсы (tchetchene.free.fr, Waynakh Online, LIMBA) · грамматика по Дж. Николс и CNRS-LGIDF.</p>
-   <p class="hint">Словарь работает офлайн · устанавливается на телефон (PWA).</p>`},
+  aboutHtml:`<h2>Нохчийн мотт — Noxchiyn Mott</h2>
+   <p>Это переводчик чеченского языка. Он создан с помощью искусственного интеллекта на основе множества свободных и открытых документов и словарей, найденных в интернете.</p>
+   <p>Ресурсов пока мало, поэтому перевод иногда бывает неточным и возможны ошибки. <b>Нам нужна ваша помощь, чтобы его улучшить.</b></p>
+   <p>Каждый раз, когда вы видите плохой перевод, нажмите кнопку «Плохой перевод» под результатом — нам придёт небольшой отчёт, и мы сможем исправить.</p>
+   <p>Если у вас есть тексты — книги, романы, пересказы, стихи, песни или любой документ (PDF и т. п.) — <a href="mailto:{MAIL}?subject=Noxchiyn%20Mott">пришлите их нам ✉</a>. Так мы сможем развивать инструмент. Вместе сохраним и усовершенствуем чеченский язык.</p>
+   <p class="hint">Источники: Викисловари (kaikki.org), словарь Мациева и открытые корпуса (arXiv:2507.12672), учебные ресурсы. Словарь доступен офлайн.</p>`},
  en:{trad:"Translator",dico:"Dictionary",phrases:"Phrases",nombres:"Numbers",gram:"Grammar","import":"Import",apropos:"About",
   btnTrad:"Translate",mt:"Online translation (Google) for sentences",
   phTrad:"Word or sentence…",phDico:"Search a word (fr, ce, ru, en)… e.g. wolf, борз",
@@ -1131,11 +1144,12 @@ const I18N={
   install:"Install",copy:"Copy",copied:"Copied!",adapted1p:"adapted to 1st person (\u201cI\u201d) \u2014 ву for a man, ю for a woman",badgeRule:"rule",histT:"History",histEmpty:"No history yet.",histClear:"Clear",ocrLow:"low confidence: a straight, sharp, well-lit photo of printed text will work much better.",
   lblHand:"handwriting",advOpts:"Options",visNoKey:"Handwriting needs a Google Vision key (free, 1,000 images/month). Create it at console.cloud.google.com and paste it above: it stays on this device.",
   fixedN:"{n} word(s) corrected via the dictionary",langDet:"detected language",ocrAdv:"transcription improved (advanced OCR)",ocrLimit:"Limit reached.",ocrRetry:"Bad transcription? Advanced OCR",ocrRetryHint:"For handwriting or difficult scans. {n} attempt(s) left this session.",ocrAdvRun:"Advanced OCR…",installHow:"To install the app:\niPhone/iPad: Safari \u2192 Share \u2192 \u201cAdd to Home Screen\u201d.\nAndroid/PC: browser menu \u2192 \u201cInstall app\u201d.",
-  aboutHtml:`<h2>Noxchiyn Mott — Нохчийн мотт</h2>
-   <p>A dictionary and translator for the Chechen language, built from published, verifiable sources. Every result shows its source:</p>
-   <p><span class="badge b-high">dictionary</span> published dictionaries (Wiktionary, Matsiev…) · <span class="badge b-mid">Textbook</span> language courses · <span class="badge b-low">online MT</span> machine translation, to be verified.</p>
-   <p>Sources: English and Russian Wiktionaries (kaikki.org, CC BY-SA) · Matsiev Chechen-Russian dictionary, Bersanov anatomy dictionary, BaltoSlav vocabulary (open corpus arXiv:2507.12672) · learning resources (tchetchene.free.fr, Waynakh Online, LIMBA) · grammar after J. Nichols and CNRS-LGIDF.</p>
-   <p class="hint">Dictionary works offline · installable on phones (PWA).</p>`},
+  aboutHtml:`<h2>Нохчийн мотт — Noxchiyn Mott</h2>
+   <p>This is a translator for the Chechen language. It was built with the help of artificial intelligence, based on many free and open-source documents and dictionaries found online.</p>
+   <p>Resources are still limited, so translations can sometimes be imperfect and mistakes may slip in. <b>We need your help to improve it.</b></p>
+   <p>Whenever you see a bad translation, click the "Bad translation" button below the result: it sends us a short report so we can fix it.</p>
+   <p>And if you have any texts — books, novels, summaries, poems, songs, or any document (PDF or other) — <a href="mailto:{MAIL}?subject=Noxchiyn%20Mott">send them to us ✉</a>. Together, let's improve and preserve the Chechen language.</p>
+   <p class="hint">Sources: Wiktionaries (kaikki.org), Matsiev dictionary and open corpora (arXiv:2507.12672), learning resources. Dictionary available offline.</p>`},
  ce:{trad:"Гочдар",dico:"Дошам",phrases:"Аларш",nombres:"Терахьдешнаш",gram:"Грамматика","import":"Импорт",apropos:"Лаьцна",
   btnTrad:"Гочде",mt:"Онлайн-гочдар (Google)",
   phTrad:"Дош я предложени…",phDico:"Дош лаха… (масала : борз)",
@@ -1156,7 +1170,7 @@ function applyLang(l){
   document.querySelectorAll("#tabs button[data-tab]").forEach(b=>{b.textContent=T(b.dataset.tab);});
   $("btn-trad").textContent=T("btnTrad");
   const set=(id,k)=>{const el=$(id);if(el)el.textContent=T(k);};
-  set("lbl-mt","mt");set("sub-title","sub");set("lbl-imp-lang","docLang");set("lbl-ocr","ocrForce");
+set("sub-title","sub");set("lbl-imp-lang","docLang");set("lbl-ocr","ocrForce");
   set("drop-text","dropTxt");set("imp-hint","impHint");set("phrases-hint","phrasesHint");set("num-hint","numHint");
   $("trad-in").placeholder=T("phTrad");
   $("dico-q").placeholder=T("phDico");
@@ -1289,7 +1303,7 @@ histWire("btn-hist-d","hist-d","nm_h_dico",it=>{
 })();
 
 /* ---------- version visible (diagnostic cache) ---------- */
-(function(){const v=document.getElementById("ver");if(v)v.textContent="· v39";})();
+(function(){const v=document.getElementById("ver");if(v)v.textContent="· v41";})();
 
 /* ---------- PWA ---------- */
 if("serviceWorker" in navigator && location.protocol.startsWith("http")){
