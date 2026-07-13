@@ -488,12 +488,17 @@ async function doTranslate(){
     if(aik){
       try{
         const gt=await geminiTranslate(q.slice(0,2000),src,dst,aik);
-        if(!gt) aiErr="reponse vide";
-        if(gt){
+        if(!gt||!gt.main) aiErr="reponse vide";
+        if(gt&&gt.main){
           box.className="card";
-          let h=`<p class="ce" style="font-size:1.2rem;font-weight:600;margin-top:0">${esc(gt)}</p>`;
-          if(isCyr(gt)) h+=`<p class="lat">${esc(translit(gt))}</p>`;
-          box.innerHTML=h; box.appendChild(copyBtn(gt)); if(lastTrans)lastTrans.out=gt; box.appendChild(reportBtn());
+          let h=`<p class="ce" style="font-size:1.2rem;font-weight:600;margin-top:0">${esc(gt.main)}</p>`;
+          if(isCyr(gt.main)) h+=`<p class="lat">${esc(translit(gt.main))}</p>`;
+          if(gt.alts&&gt.alts.length){
+            h+=`<p class="hint" style="margin-top:10px">${T("variants")} : `
+              +gt.alts.map(v=>`<span class="ce" style="font-weight:600">${esc(v)}</span>${isCyr(v)?` <span class="lat">(${esc(translit(v))})</span>`:""}`).join(" &nbsp;·&nbsp; ")+`</p>`;
+          }
+          if(NM_DEBUG&&aiErr) h='<p class="hint" style="color:#d05e57;margin-top:0"><b>IA :</b> '+esc(aiErr)+'</p>'+h;
+          box.innerHTML=h; box.appendChild(copyBtn(gt.main)); if(lastTrans)lastTrans.out=gt.main; box.appendChild(reportBtn());
           return;
         }
       }catch(e){ aiErr=(e&&e.message)||String(e); }
@@ -870,14 +875,36 @@ async function geminiTranslate(q,src,dst,key){
     prompt+=" Respecte scrupuleusement la classe indiquée entre crochets dans le lexique ci-dessous.";
   }
   if(hints.length) prompt+=" Lexique vérifié (à utiliser tel quel) : "+hints.join(" ; ")+".";
-  prompt+=" Réponds UNIQUEMENT par la traduction, sans guillemets ni explication.\n\nPhrase : "+q;
-  const body={contents:[{parts:[{text:prompt}]}],generationConfig:{temperature:0.2}};
+  if(dst==="ce"){
+    prompt+=" CONJUGAISON : mets le verbe au TEMPS demandé (présent, passé, futur) — n'emploie pas la forme de base/l'infinitif à la place du présent.";
+    prompt+=" Exemples corrects de traduction français → tchétchène (imite exactement ce style, cette conjugaison et cet accord de classe) :";
+    prompt+=" « J'apprends le tchétchène » → « Аса нохчийн мотт Ӏамабо » ;";
+    prompt+=" « Je vais à la mosquée » → « Со маьждиге воьду » ;";
+    prompt+=" « L'eau est froide » → « Хи шийла ду » ;";
+    prompt+=" « Le loup court » → « Борз йода » ;";
+    prompt+=" « Je lis un livre » → « Аса книга йоьшу » ;";
+    prompt+=" « Je bois de l'eau » → « Аса хи молу ».";
+    prompt+=" Note : au présent, le sujet «je» d'un verbe transitif est «Аса» (ergatif), et le verbe s'accorde en classe avec l'objet.";
+  }
+  prompt+=" Donne la MEILLEURE traduction, puis 2 autres variantes correctes possibles (formulations ou synonymes différents).";
+  prompt+=" Réponds STRICTEMENT en JSON, sans texte autour : {\"principale\":\"...\",\"variantes\":[\"...\",\"...\"]}.\n\nPhrase : "+q;
+  const body={contents:[{parts:[{text:prompt}]}],generationConfig:{temperature:0.5,responseMimeType:"application/json"}};
   const resp=await fetch("https://generativelanguage.googleapis.com/v1beta/models/"+model+":generateContent?key="+encodeURIComponent(key),
     {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
   const j=await resp.json();
   if(j.error) throw new Error(j.error.message||"Gemini");
   const c=j.candidates&&j.candidates[0];
-  return ((c&&c.content&&c.content.parts||[]).map(p=>p.text||"").join("")||"").trim();
+  let raw=((c&&c.content&&c.content.parts||[]).map(p=>p.text||"").join("")||"").trim();
+  raw=raw.replace(/^```json\s*/i,"").replace(/```$/,"").trim();
+  let main="",alts=[];
+  try{ const o=JSON.parse(raw);
+    main=(o.principale||o.principal||"").toString().trim();
+    if(Array.isArray(o.variantes)) alts=o.variantes.map(x=>String(x).trim()).filter(Boolean);
+  }catch(e){ main=raw; }
+  // dédupe : variantes différentes de la principale
+  const seen=new Set([norm(main)]);
+  alts=alts.filter(v=>{const n=norm(v); if(seen.has(n))return false; seen.add(n); return true;}).slice(0,3);
+  return {main:main, alts:alts};
 }
 /* ---------- assistance dictionnaire : corrige les mots à 1 lettre près (candidat unique) ---------- */
 let CE_SET=null,RU_SET=null,DEL_IDX=null;
@@ -1070,7 +1097,7 @@ const I18N={
   mtLong:"Texte long : seuls les 1 800 premiers caractères ont été traduits.",
   mtOffline:"Service en ligne inaccessible (hors ligne ou accès bloqué).",mtOpen:"Ouvrir dans Google Translate ↗",
   mtDirect:"directe",mtPivot:"pivot russe",
-  badgeMT:"MT en ligne",badgeAI:"IA",reportBtn:"⚠ Mauvaise traduction",reportAsk:"Quelle serait la bonne traduction ? (facultatif)",reportOk:"Merci ! Votre signalement a été envoyé.",reportErr:"Envoi impossible pour le moment. Réessayez plus tard.",reportSending:"Envoi…",badgeManual:"Manuel",badgeDict:"dictionnaire",badgeWord:"MT mot isolé",
+  badgeMT:"MT en ligne",badgeAI:"IA",variants:"Autres possibilités",reportBtn:"⚠ Mauvaise traduction",reportAsk:"Quelle serait la bonne traduction ? (facultatif)",reportOk:"Merci ! Votre signalement a été envoyé.",reportErr:"Envoi impossible pour le moment. Réessayez plus tard.",reportSending:"Envoi…",badgeManual:"Manuel",badgeDict:"dictionnaire",badgeWord:"MT mot isolé",
   noRes:"Aucun résultat dans le dictionnaire. Essayez la traduction en ligne ou une autre orthographe (ӏ / 1, аь…).",
   noRes2:"Aucun résultat.",variantOf:"variante de",
   impReading:"Lecture de",impPrep:"Préparation de l'image…",
@@ -1104,7 +1131,7 @@ const I18N={
   mtLong:"Длинный текст: переведены только первые 1 800 знаков.",
   mtOffline:"Онлайн-сервис недоступен (нет сети или доступ заблокирован).",mtOpen:"Открыть в Google Translate ↗",
   mtDirect:"прямой",mtPivot:"через русский",
-  badgeMT:"онлайн-МП",badgeAI:"ИИ",reportBtn:"⚠ Плохой перевод",reportAsk:"Какой был бы правильный перевод? (необязательно)",reportOk:"Спасибо! Ваше сообщение отправлено.",reportErr:"Не удалось отправить. Попробуйте позже.",reportSending:"Отправка…",badgeManual:"Учебник",badgeDict:"словарь",badgeWord:"МП (слово)",
+  badgeMT:"онлайн-МП",badgeAI:"ИИ",variants:"Другие варианты",reportBtn:"⚠ Плохой перевод",reportAsk:"Какой был бы правильный перевод? (необязательно)",reportOk:"Спасибо! Ваше сообщение отправлено.",reportErr:"Не удалось отправить. Попробуйте позже.",reportSending:"Отправка…",badgeManual:"Учебник",badgeDict:"словарь",badgeWord:"МП (слово)",
   noRes:"В словаре ничего не найдено. Попробуйте онлайн-перевод или другое написание (ӏ / 1, аь…).",
   noRes2:"Ничего не найдено.",variantOf:"вариант слова",
   impReading:"Чтение",impPrep:"Подготовка изображения…",
@@ -1138,7 +1165,7 @@ const I18N={
   mtLong:"Long text: only the first 1,800 characters were translated.",
   mtOffline:"Online service unreachable (offline or blocked).",mtOpen:"Open in Google Translate ↗",
   mtDirect:"direct",mtPivot:"Russian pivot",
-  badgeMT:"online MT",badgeAI:"AI",reportBtn:"⚠ Bad translation",reportAsk:"What would be the correct translation? (optional)",reportOk:"Thanks! Your report was sent.",reportErr:"Could not send right now. Please try again later.",reportSending:"Sending…",badgeManual:"Textbook",badgeDict:"dictionary",badgeWord:"MT (word)",
+  badgeMT:"online MT",badgeAI:"AI",variants:"Other options",reportBtn:"⚠ Bad translation",reportAsk:"What would be the correct translation? (optional)",reportOk:"Thanks! Your report was sent.",reportErr:"Could not send right now. Please try again later.",reportSending:"Sending…",badgeManual:"Textbook",badgeDict:"dictionary",badgeWord:"MT (word)",
   noRes:"No dictionary result. Try online translation or another spelling (ӏ / 1, аь…).",
   noRes2:"No results.",variantOf:"variant of",
   impReading:"Reading",impPrep:"Preparing image…",
@@ -1308,7 +1335,7 @@ histWire("btn-hist-d","hist-d","nm_h_dico",it=>{
 })();
 
 /* ---------- version visible (diagnostic cache) ---------- */
-(function(){const v=document.getElementById("ver");if(v)v.textContent="· v42";})();
+(function(){const v=document.getElementById("ver");if(v)v.textContent="· v44";})();
 
 /* ---------- PWA ---------- */
 if("serviceWorker" in navigator && location.protocol.startsWith("http")){

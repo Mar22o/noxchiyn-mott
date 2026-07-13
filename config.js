@@ -8,7 +8,7 @@
 //
 //  >>> Collez votre cle Gemini (AI Studio) entre les guillemets, puis televersez. <<<
 // ===================================================================
-window.NM_AI_KEY = "AQ.Ab8RN6LWJqSzuWMq16g85FrxeCuipQ2UAsF88qr-GOgSEWpxTA";
+window.NM_AI_KEY = "AIzaSyC7952IAWqqxOdtHZP5HrEbxHyYQ09PTlA";
 
 // Modele IA (laisser tel quel ; a changer seulement si Google le renomme un jour)
 window.NM_OCR_MODEL = "gemini-2.5-flash";
