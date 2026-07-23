@@ -844,6 +844,24 @@ async function geminiOcr(file,key){
   const t=c&&c.content&&c.content.parts&&c.content.parts.map(p=>p.text||"").join("");
   return (t||"").trim();
 }
+/* ---------- exemples pro proches (retrieval sur SMOL) ---------- */
+const NM_EX = (typeof window!=="undefined" && window.NM_EXAMPLES) || [];
+function retrieveExamples(q,src){
+  if(!NM_EX.length) return [];
+  const field = src==="ru" ? "r" : src==="en" ? "e" : null;   // SMOL a en/ru, pas fr
+  if(!field) return [];
+  const qw = new Set(normFr(q).split(/[^a-zà-ÿа-яё]+/).filter(w=>w.length>3));
+  if(!qw.size) return [];
+  const scored=[];
+  for(const ex of NM_EX){
+    const t=normFr(ex[field]||""); if(!t) continue;
+    let s=0; for(const w of qw){ if(t.includes(w)) s++; }
+    if(s>0) scored.push([s,ex]);
+  }
+  scored.sort((a,b)=>b[0]-a[0]);
+  return scored.slice(0,4).map(x=>x[1]);
+}
+
 /* ---------- traduction de phrases par IA (Gemini), ancrée sur le dictionnaire ---------- */
 function transHints(q,src){
   const words=q.toLowerCase().split(/[^a-zà-ÿа-яёӏ-]+/i).filter(w=>w.length>1&&!isStop(w,src));
@@ -875,6 +893,12 @@ async function geminiTranslate(q,src,dst,key){
     prompt+=" Respecte scrupuleusement la classe indiquée entre crochets dans le lexique ci-dessous.";
   }
   if(hints.length) prompt+=" Lexique vérifié (à utiliser tel quel) : "+hints.join(" ; ")+".";
+  const rex=(dst==="ce")?retrieveExamples(q,src):[];
+  if(rex.length){
+    const fld=src==="ru"?"r":"e";
+    prompt+=" Exemples proches traduits par un professionnel ("+(src==="ru"?"russe":"anglais")+" → tchétchène), à imiter pour le style et la grammaire : "
+      +rex.map(e=>"« "+(e[fld]||"")+" » → « "+e.c+" »").join(" ; ")+".";
+  }
   if(dst==="ce"){
     prompt+=" CONJUGAISON : mets le verbe au TEMPS demandé (présent, passé, futur) — n'emploie pas la forme de base/l'infinitif à la place du présent.";
     prompt+=" Exemples corrects de traduction français → tchétchène (imite exactement ce style, cette conjugaison et cet accord de classe) :";
@@ -883,8 +907,11 @@ async function geminiTranslate(q,src,dst,key){
     prompt+=" « L'eau est froide » → « Хи шийла ду » ;";
     prompt+=" « Le loup court » → « Борз йода » ;";
     prompt+=" « Je lis un livre » → « Аса книга йоьшу » ;";
-    prompt+=" « Je bois de l'eau » → « Аса хи молу ».";
-    prompt+=" Note : au présent, le sujet «je» d'un verbe transitif est «Аса» (ergatif), et le verbe s'accorde en classe avec l'objet.";
+    prompt+=" « Je bois de l'eau » → « Аса хи молу » ;";
+    prompt+=" « Comment t'appelles-tu ? » → « Хьан цӀе хӀун ю? » ;";
+    prompt+=" « Je ne sais pas » → « Суна ца хаьа » ;";
+    prompt+=" « D'où viens-tu ? » (à un homme) → « Хьо мичара ву? ».";
+    prompt+=" Note : au présent, le sujet «je» d'un verbe transitif est «Аса» (ergatif) ; le verbe/la copule s'accorde en classe avec l'objet ; la négation se forme avec «ца».";
   }
   prompt+=" Donne la MEILLEURE traduction, puis 2 autres variantes correctes possibles (formulations ou synonymes différents).";
   prompt+=" Réponds STRICTEMENT en JSON, sans texte autour : {\"principale\":\"...\",\"variantes\":[\"...\",\"...\"]}.\n\nPhrase : "+q;
@@ -1335,7 +1362,7 @@ histWire("btn-hist-d","hist-d","nm_h_dico",it=>{
 })();
 
 /* ---------- version visible (diagnostic cache) ---------- */
-(function(){const v=document.getElementById("ver");if(v)v.textContent="· v44";})();
+(function(){const v=document.getElementById("ver");if(v)v.textContent="· v46";})();
 
 /* ---------- PWA ---------- */
 if("serviceWorker" in navigator && location.protocol.startsWith("http")){
