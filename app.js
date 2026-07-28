@@ -520,6 +520,7 @@ async function doTranslate(){
         cands.sort((a,b)=>(a[2].leaks+a[2].unknown)-(b[2].leaks+b[2].unknown));
         const [name,raw,anaRaw]=cands[0];
         const ana=await fixLeaksOnline(anaRaw);
+        ana.text=await enforceDict(ana.text,q,src);
         copyTarget=ana.text;
         html+=`<p class="ce" style="font-size:1.2rem;font-weight:600;margin-top:0">${esc(ana.text)}</p>
           <p class="lat">${esc(translit(ana.text))}</p>`;
@@ -581,17 +582,27 @@ function situationSearch(v){
   const nv=normFr(v);
   const words=nv.split(/[^a-zà-ÿа-яёӏ-]+/i).filter(w=>w.length>2&&!STOP_FR.has(w)&&!STOP_EN.has(w)&&!STOP_RU.has(w));
   if(!words.length) return [];
+  const pref=(x,y)=>{let n=0;const m=Math.min(x.length,y.length);while(n<m&&x[n]===y[n])n++;return n;};
   const scored=[];
   for(const p of NM_PHRASES){
     const hayK=normFr([p.k||"",p.ke||"",p.kr||"",p.cat].join(" "));   // mots-clés de situation
     const hayT=normFr([p.ce,p.fr].join(" "));                          // texte de la fiche
-    let s=0; for(const w of words){ if(hayK.includes(w)) s+=2; else if(hayT.includes(w)) s+=1; }
+    const toks=hayK.split(/\s+/).concat(hayT.split(/\s+/));
+    let s=0;
+    for(const w of words){
+      if(hayK.includes(w)){ s+=3; continue; }
+      if(hayT.includes(w)){ s+=2; continue; }
+      let best=0;                                                      // racines proches : « saluer » ≈ « salutation »
+      for(const t of toks){ const c=pref(t,w); if(c>best) best=c; }
+      if(best>=4&&best>=w.length-2) s+=1;
+    }
     if(s>0) scored.push([s,p]);
   }
   scored.sort((a,b)=>b[0]-a[0]);
-  const best=scored[0]?scored[0][0]:0;
-  const seuil=best>=2?best-0:1;   // si une bonne correspondance existe, ne garder que le haut du panier
-  return scored.filter(x=>x[0]>=seuil).slice(0,6).map(x=>x[1]);
+  const top=scored[0]?scored[0][0]:0;
+  if(!top) return [];
+  const seuil=Math.max(1,top-1);
+  return scored.filter(x=>x[0]>=seuil).slice(0,8).map(x=>x[1]);
 }
 (function(){
   const q=document.getElementById("phr-q"); if(!q) return;
@@ -844,11 +855,11 @@ async function geminiOcr(file,key){
   const t=c&&c.content&&c.content.parts&&c.content.parts.map(p=>p.text||"").join("");
   return (t||"").trim();
 }
-/* ---------- exemples pro proches (retrieval sur SMOL) ---------- */
+/* ---------- exemples proches : corpus pro (SMOL) + banque de phrases ---------- */
 const NM_EX = (typeof window!=="undefined" && window.NM_EXAMPLES) || [];
+const NM_BANK = (typeof window!=="undefined" && window.NM_BANK) || [];
 function retrieveExamples(q,src){
-  if(!NM_EX.length) return [];
-  const field = src==="ru" ? "r" : src==="en" ? "e" : null;   // SMOL a en/ru, pas fr
+  const field = src==="ru" ? "r" : src==="en" ? "e" : null;
   if(!field) return [];
   const qw = new Set(normFr(q).split(/[^a-zà-ÿа-яё]+/).filter(w=>w.length>3));
   if(!qw.size) return [];
@@ -856,13 +867,52 @@ function retrieveExamples(q,src){
   for(const ex of NM_EX){
     const t=normFr(ex[field]||""); if(!t) continue;
     let s=0; for(const w of qw){ if(t.includes(w)) s++; }
+    if(s>0) scored.push([s*3,ex]);                    // traductions professionnelles prioritaires
+  }
+  if(src==="ru") for(const ex of NM_BANK){
+    const t=normFr(ex.r); if(!t) continue;
+    let s=0; for(const w of qw){ if(t.includes(w)) s++; }
     if(s>0) scored.push([s,ex]);
   }
   scored.sort((a,b)=>b[0]-a[0]);
-  return scored.slice(0,4).map(x=>x[1]);
+  const out=[],seen=new Set();
+  for(const [,ex] of scored){ if(seen.has(ex.c)) continue; seen.add(ex.c); out.push(ex); if(out.length===4) break; }
+  return out;
 }
 
 /* ---------- traduction de phrases par IA (Gemini), ancrée sur le dictionnaire ---------- */
+async function enforceDict(text,q,src){
+  // Corrige la sortie Google : impose les mots vérifiés du dictionnaire et l'accord de classe du verbe suivant
+  try{
+    if(!text) return text;
+    const words=[...new Set(q.toLowerCase().split(/[^a-zà-ÿа-яёӏ-]+/i).filter(w=>w.length>2&&!isStop(w,src)))].slice(0,4);
+    let toks=text.split(/(\s+)/), changed=false;
+    for(const w of words){
+      const refs=dedupe(lookup(w,src).exact);
+      if(!refs.length) continue;
+      const d=refData(refs[0]);
+      if(!d.ce||d.ce.includes(" ")) continue;
+      const ceL=d.ce.toLowerCase();
+      if(text.toLowerCase().includes(ceL)) continue;                 // déjà correct
+      const gw=((await gtx(src,"ce",w).catch(()=>""))||"").trim().split(/\s+/)[0].replace(/[.,!?;:]+$/,"");
+      if(!gw||gw.length<3||gw.toLowerCase()===ceL) continue;
+      for(let i=0;i<toks.length;i++){
+        const bare=toks[i].replace(/[.,!?;:]+$/,"");
+        if(bare.toLowerCase()!==gw.toLowerCase()) continue;
+        toks[i]=toks[i].replace(bare,d.ce); changed=true;
+        const ci=classInfo(d.cls_n);
+        const L=ci&&ci.sg?ci.sg.p[0]:null;                           // в / й / б / д
+        if(L&&L!=="д"&&toks[i+2]){
+          const nb=toks[i+2].replace(/[.,!?;:]+$/,"");
+          if(/^д[аоуеия]/i.test(nb)&&nb.length<=7) toks[i+2]=toks[i+2].replace(/^д/i,L), changed=true;
+        }
+        break;
+      }
+    }
+    return changed?toks.join(""):text;
+  }catch(e){ return text; }
+}
+
 function transHints(q,src){
   const words=q.toLowerCase().split(/[^a-zà-ÿа-яёӏ-]+/i).filter(w=>w.length>1&&!isStop(w,src));
   const hints=[],seen=new Set();
@@ -893,11 +943,15 @@ async function geminiTranslate(q,src,dst,key){
     prompt+=" Respecte scrupuleusement la classe indiquée entre crochets dans le lexique ci-dessous.";
   }
   if(hints.length) prompt+=" Lexique vérifié (à utiliser tel quel) : "+hints.join(" ; ")+".";
-  const rex=(dst==="ce")?retrieveExamples(q,src):[];
+  let rex=(dst==="ce")?retrieveExamples(q,src):[];
+  if(dst==="ce"&&rex.length<4&&src!=="ru"&&NM_BANK.length){
+    try{ const qru=await gtx(src,"ru",q.slice(0,300));
+      if(qru) for(const m of retrieveExamples(qru,"ru")){ if(rex.length>=4)break; if(!rex.some(x=>x.c===m.c)) rex.push(m); }
+    }catch(e){}
+  }
   if(rex.length){
-    const fld=src==="ru"?"r":"e";
-    prompt+=" Exemples proches traduits par un professionnel ("+(src==="ru"?"russe":"anglais")+" → tchétchène), à imiter pour le style et la grammaire : "
-      +rex.map(e=>"« "+(e[fld]||"")+" » → « "+e.c+" »").join(" ; ")+".";
+    prompt+=" Exemples vérifiés (à imiter pour le style et la grammaire) : "
+      +rex.map(e=>"« "+((src==="en"&&e.e)?e.e:(e.r||e.e||""))+" » → « "+e.c+" »").join(" ; ")+".";
   }
   if(dst==="ce"){
     prompt+=" CONJUGAISON : mets le verbe au TEMPS demandé (présent, passé, futur) — n'emploie pas la forme de base/l'infinitif à la place du présent.";
@@ -1130,7 +1184,7 @@ const I18N={
   impReading:"Lecture de",impPrep:"Préparation de l'image…",
   impDone:"Texte extrait ({n} caractères). Relisez, corrigez si besoin, puis traduisez.",
   impNone:"Aucun texte détecté. S'il s'agit d'un scan, cochez « forcer l'OCR ».",err:"Erreur : ",ocrModel:"Téléchargement du modèle OCR…",
-  "cat:Salutations":"Salutations","cat:Vœux et bénédictions":"Vœux et bénédictions","cat:Hospitalité":"Hospitalité","cat:Événements de la vie":"Événements de la vie","cat:Religion et fêtes":"Religion et fêtes","cat:Respect des aînés":"Respect des aînés","cat:Voyage":"Voyage",phrQ:"Décrivez la situation… ex : quelqu\u2019un a acheté un nouvel habit",phrFound:"Expressions pour cette situation","cat:Politesse":"Politesse","cat:Base":"Base","cat:Conversation":"Conversation","cat:Langue":"Langue","cat:Sentiments":"Sentiments",
+  "cat:Faire connaissance":"Faire connaissance","cat:Famille":"Famille","cat:Santé":"Santé","cat:Achats":"Achats","cat:Urgence":"Urgence","cat:Météo et heure":"Météo et heure","cat:Salutations":"Salutations","cat:Vœux et bénédictions":"Vœux et bénédictions","cat:Hospitalité":"Hospitalité","cat:Événements de la vie":"Événements de la vie","cat:Religion et fêtes":"Religion et fêtes","cat:Respect des aînés":"Respect des aînés","cat:Voyage":"Voyage",phrQ:"Décrivez la situation… ex : quelqu\u2019un a acheté un nouvel habit",phrFound:"Expressions pour cette situation","cat:Politesse":"Politesse","cat:Base":"Base","cat:Conversation":"Conversation","cat:Langue":"Langue","cat:Sentiments":"Sentiments",
   numN:"Nombre",numCE:"Tchétchène",numTL:"Translit.",numST:"Structure",
   install:"Installer",copy:"Copier",copied:"Copié !",adapted1p:"adapté à la 1re personne (« je ») — ву pour un homme, ю pour une femme",badgeRule:"règle",histT:"Historique",histEmpty:"Aucun historique pour l\u2019instant.",histClear:"Effacer",ocrLow:"confiance faible : une photo droite, nette et bien éclairée d\u2019un texte imprimé donnera un bien meilleur résultat.",
   lblHand:"écriture manuscrite",advOpts:"Options",visNoKey:"L\u2019écriture manuscrite nécessite une clé Google Vision (gratuite, 1\u00a0000 images/mois). Créez-la sur console.cloud.google.com (API Vision \u2192 Identifiants \u2192 Clé API), puis collez-la ci-dessus : elle reste sur cet appareil.",
@@ -1164,7 +1218,7 @@ const I18N={
   impReading:"Чтение",impPrep:"Подготовка изображения…",
   impDone:"Текст извлечён ({n} знаков). Проверьте и переводите.",
   impNone:"Текст не обнаружен. Если это скан, включите «принудительный OCR».",err:"Ошибка: ",ocrModel:"Загрузка модели OCR…",
-  "cat:Salutations":"Приветствия","cat:Vœux et bénédictions":"Пожелания и благословения","cat:Hospitalité":"Гостеприимство","cat:Événements de la vie":"События жизни","cat:Religion et fêtes":"Религия и праздники","cat:Respect des aînés":"Уважение к старшим","cat:Voyage":"Дорога",phrQ:"Опишите ситуацию… напр.: человек купил обновку",phrFound:"Выражения для этой ситуации","cat:Politesse":"Вежливость","cat:Base":"Основное","cat:Conversation":"Разговор","cat:Langue":"Язык","cat:Sentiments":"Чувства",
+  "cat:Faire connaissance":"Знакомство","cat:Famille":"Семья","cat:Santé":"Здоровье","cat:Achats":"Покупки","cat:Urgence":"Срочные случаи","cat:Météo et heure":"Погода и время","cat:Salutations":"Приветствия","cat:Vœux et bénédictions":"Пожелания и благословения","cat:Hospitalité":"Гостеприимство","cat:Événements de la vie":"События жизни","cat:Religion et fêtes":"Религия и праздники","cat:Respect des aînés":"Уважение к старшим","cat:Voyage":"Дорога",phrQ:"Опишите ситуацию… напр.: человек купил обновку",phrFound:"Выражения для этой ситуации","cat:Politesse":"Вежливость","cat:Base":"Основное","cat:Conversation":"Разговор","cat:Langue":"Язык","cat:Sentiments":"Чувства",
   numN:"Число",numCE:"Чеченский",numTL:"Транслит.",numST:"Структура",
   install:"Установить",copy:"Копировать",copied:"Скопировано!",adapted1p:"адаптировано к 1-му лицу («я») — ву для мужчины, ю для женщины",badgeRule:"правило",histT:"История",histEmpty:"История пока пуста.",histClear:"Очистить",ocrLow:"низкая уверенность: прямое, чёткое и хорошо освещённое фото печатного текста даст куда лучший результат.",
   lblHand:"рукописный текст",advOpts:"Параметры",visNoKey:"Для рукописного текста нужен ключ Google Vision (бесплатно, 1\u00a0000 изображений/мес). Создайте его на console.cloud.google.com и вставьте выше: он хранится на этом устройстве.",
@@ -1198,7 +1252,7 @@ const I18N={
   impReading:"Reading",impPrep:"Preparing image…",
   impDone:"Text extracted ({n} chars). Review, then translate.",
   impNone:"No text detected. If it is a scan, enable “force OCR”.",err:"Error: ",ocrModel:"Downloading OCR model…",
-  "cat:Salutations":"Greetings","cat:Vœux et bénédictions":"Wishes & blessings","cat:Hospitalité":"Hospitality","cat:Événements de la vie":"Life events","cat:Religion et fêtes":"Religion & holidays","cat:Respect des aînés":"Respect for elders","cat:Voyage":"Travel",phrQ:"Describe the situation… e.g. someone bought new clothes",phrFound:"Phrases for this situation","cat:Politesse":"Politeness","cat:Base":"Basics","cat:Conversation":"Conversation","cat:Langue":"Language","cat:Sentiments":"Feelings",
+  "cat:Faire connaissance":"Meeting people","cat:Famille":"Family","cat:Santé":"Health","cat:Achats":"Shopping","cat:Urgence":"Emergency","cat:Météo et heure":"Weather & time","cat:Salutations":"Greetings","cat:Vœux et bénédictions":"Wishes & blessings","cat:Hospitalité":"Hospitality","cat:Événements de la vie":"Life events","cat:Religion et fêtes":"Religion & holidays","cat:Respect des aînés":"Respect for elders","cat:Voyage":"Travel",phrQ:"Describe the situation… e.g. someone bought new clothes",phrFound:"Phrases for this situation","cat:Politesse":"Politeness","cat:Base":"Basics","cat:Conversation":"Conversation","cat:Langue":"Language","cat:Sentiments":"Feelings",
   numN:"Number",numCE:"Chechen",numTL:"Translit.",numST:"Structure",
   install:"Install",copy:"Copy",copied:"Copied!",adapted1p:"adapted to 1st person (\u201cI\u201d) \u2014 ву for a man, ю for a woman",badgeRule:"rule",histT:"History",histEmpty:"No history yet.",histClear:"Clear",ocrLow:"low confidence: a straight, sharp, well-lit photo of printed text will work much better.",
   lblHand:"handwriting",advOpts:"Options",visNoKey:"Handwriting needs a Google Vision key (free, 1,000 images/month). Create it at console.cloud.google.com and paste it above: it stays on this device.",
@@ -1215,7 +1269,7 @@ const I18N={
   phNum:"Терахь язде (0–999 999)",impTrad:"ХӀара йоза гочде →",sub:"Нохчийн мотт · нохчийн гочдархо",
   lnFr:"Французийн",lnCe:"Нохчийн",lnRu:"Оьрсийн",lnEn:"Ингалсан",
   docLang:"Документан мотт:",cardDict:"Дошам",cardExpr:"Аларш",badgeDict:"дошам",
-  "cat:Salutations":"Маршалла","cat:Hospitalité":"Хьошалла","cat:Voyage":"Некъ","cat:Langue":"Мотт",numCE:"Нохчийн",numN:"Терахь"}
+  "cat:Faire connaissance":"Вовшахкхетар","cat:Famille":"Доьзал","cat:Santé":"Могашалла","cat:Achats":"Эцар","cat:Urgence":"ГӀо","cat:Météo et heure":"Хенан хӀоттам","cat:Salutations":"Маршалла","cat:Hospitalité":"Хьошалла","cat:Voyage":"Некъ","cat:Langue":"Мотт",numCE:"Нохчийн",numN:"Терахь"}
 };
 function T(k){
   const l=I18N[CURLANG]||{};
@@ -1362,7 +1416,7 @@ histWire("btn-hist-d","hist-d","nm_h_dico",it=>{
 })();
 
 /* ---------- version visible (diagnostic cache) ---------- */
-(function(){const v=document.getElementById("ver");if(v)v.textContent="· v46";})();
+(function(){const v=document.getElementById("ver");if(v)v.textContent="· v48";})();
 
 /* ---------- PWA ---------- */
 if("serviceWorker" in navigator && location.protocol.startsWith("http")){

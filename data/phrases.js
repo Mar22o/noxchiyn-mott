@@ -60,5 +60,82 @@ window.NM_PHRASES = [
  {cat:"Langue", ce:"Суна ца хаьа", fr:"Je ne sais pas", k:"savoir ignorer", ke:"i do not know", kr:"не знаю"},
  // ---------- Sentiments ----------
  {cat:"Sentiments", ce:"Суна хьо веза", fr:"Je t'aime (dit à un homme)", k:"amour aimer homme déclaration", ke:"i love you man", kr:"люблю тебя мужчина"},
- {cat:"Sentiments", ce:"Суна хьо еза", fr:"Je t'aime (dit à une femme)", k:"amour aimer femme déclaration", ke:"i love you woman", kr:"люблю тебя женщина"}
+ {cat:"Sentiments", ce:"Суна хьо еза", fr:"Je t'aime (dit à une femme)", k:"amour aimer femme déclaration", ke:"i love you woman", kr:"люблю тебя женщина"},
+ // ---------- Faire connaissance ----------
+ {cat:"Faire connaissance", ce:"Хьо ган хазахета", fr:"Content(e) de te voir / enchanté(e)", k:"enchanté rencontrer content plaisir voir connaissance", ke:"nice to meet you glad see", kr:"приятно познакомиться рад видеть"},
+ {cat:"Faire connaissance", ce:"Хьан мас шо ду?", fr:"Quel âge as-tu ?", k:"âge ans vieux", ke:"how old age", kr:"сколько лет возраст"},
+ {cat:"Faire connaissance", ce:"Сан … шо ду", fr:"J'ai … ans (remplacez par le nombre)", k:"âge ans", ke:"years old", kr:"мне лет"},
+ {cat:"Faire connaissance", ce:"Хьо мичахь ӏаш ву? / ю?", fr:"Où habites-tu ? (ву à un homme / ю à une femme)", k:"habiter vivre où adresse maison", ke:"where live", kr:"где живёшь жить"},
+ {cat:"Faire connaissance", ce:"Со … ӏаш ву / ю", fr:"J'habite à … (ву homme / ю femme)", k:"habiter vivre ville", ke:"i live in", kr:"я живу"},
+ {cat:"Faire connaissance", ce:"ХӀара сан доттагӏ ву", fr:"Voici mon ami", k:"présenter ami copain", ke:"my friend introduce", kr:"мой друг познакомить"},
+ // ---------- Famille ----------
+ {cat:"Famille", ce:"Хьан доьзал муха бу?", fr:"Comment va ta famille ?", k:"famille nouvelles", ke:"family how", kr:"семья как"},
+ {cat:"Famille", ce:"ХӀара сан нана ю", fr:"Voici ma mère", k:"mère maman présenter famille", ke:"my mother", kr:"моя мама мать"},
+ {cat:"Famille", ce:"ХӀара сан да ву", fr:"Voici mon père", k:"père papa présenter famille", ke:"my father", kr:"мой отец папа"},
+ {cat:"Famille", ce:"Хьан бераш дуй?", fr:"As-tu des enfants ?", k:"enfants famille", ke:"children kids", kr:"дети есть"},
+ // ---------- Langue ----------
+ {cat:"Langue", ce:"Со ца кхета", fr:"Je ne comprends pas", k:"comprendre pas compris", ke:"understand don't", kr:"не понимаю"},
+ {cat:"Langue", ce:"Со кхийтира", fr:"J'ai compris", k:"compris comprendre", ke:"understood got it", kr:"понял поняла"},
+ {cat:"Langue", ce:"Юха алахьа", fr:"Répète, s'il te plaît", k:"répéter redire encore", ke:"repeat again please", kr:"повтори ещё раз"},
+ {cat:"Langue", ce:"Меллаша дийцахьа", fr:"Parle plus lentement, s'il te plaît", k:"lentement doucement vite parler", ke:"slowly speak", kr:"медленнее говори"},
+ {cat:"Langue", ce:"Хьуна оьрсийн мотт хаьий?", fr:"Parles-tu russe ?", k:"russe parler langue", ke:"speak russian", kr:"знаешь русский говоришь"},
+ {cat:"Langue", ce:"Суна ингалсан мотт хаьа", fr:"Je parle anglais", k:"anglais parler langue", ke:"i speak english", kr:"знаю английский"},
+ {cat:"Langue", ce:"И нохчийн маттахь муха эр ду?", fr:"Comment dit-on ça en tchétchène ?", k:"comment dire traduire mot tchétchène", ke:"how say chechen", kr:"как сказать по-чеченски"},
+ // ---------- Politesse ----------
+ {cat:"Politesse", ce:"Бехк ма билла", fr:"Excuse-moi / pardon", k:"pardon excuser désolé faute", ke:"sorry excuse me", kr:"извини прости"},
+ {cat:"Politesse", ce:"Бехк ма биллалаш", fr:"Excusez-moi (poli, ou à plusieurs)", k:"pardon excusez poli", ke:"excuse me polite", kr:"извините простите"},
+ {cat:"Politesse", ce:"Дехар до", fr:"S'il te plaît (en demandant quelque chose)", k:"s'il te plaît demander prière", ke:"please request", kr:"пожалуйста прошу"},
+ {cat:"Politesse", ce:"Доккха баркалла", fr:"Merci beaucoup", k:"merci beaucoup remercier", ke:"thank you much", kr:"большое спасибо"},
+ {cat:"Politesse", ce:"ХӀумма а дац", fr:"De rien / ce n'est rien", k:"de rien pas de quoi", ke:"you're welcome nothing", kr:"не за что ничего"},
+ {cat:"Politesse", ce:"Собар де", fr:"Patiente / un instant", k:"attendre patienter instant moment", ke:"wait moment patience", kr:"подожди минутку терпение"},
+ // ---------- Santé ----------
+ {cat:"Santé", ce:"Могашалла муха ю?", fr:"Comment va la santé ?", k:"santé aller bien", ke:"health how", kr:"здоровье как"},
+ {cat:"Santé", ce:"Со цомгаш ву / ю", fr:"Je suis malade (ву homme / ю femme)", k:"malade maladie mal", ke:"sick ill", kr:"болею болен больна"},
+ {cat:"Santé", ce:"Суна лор оьшу", fr:"J'ai besoin d'un médecin", k:"médecin docteur soigner hôpital", ke:"doctor need", kr:"врач нужен доктор"},
+ {cat:"Santé", ce:"Сан корта лозу", fr:"J'ai mal à la tête", k:"mal tête douleur", ke:"headache hurts", kr:"голова болит"},
+ // ---------- Achats ----------
+ {cat:"Achats", ce:"ХӀокхуьнан мах хӏун бу?", fr:"Combien ça coûte ?", k:"prix coûter combien cher acheter payer", ke:"how much cost price", kr:"сколько стоит цена"},
+ {cat:"Achats", ce:"Суна хӀара оьшу", fr:"Il me faut ceci / je prends ça", k:"acheter vouloir besoin prendre", ke:"i need want this buy", kr:"мне нужно это куплю"},
+ {cat:"Achats", ce:"Сан ахча дац", fr:"Je n'ai pas d'argent", k:"argent payer", ke:"no money", kr:"нет денег"},
+ {cat:"Achats", ce:"Туька мичахь ю?", fr:"Où est le magasin ?", k:"magasin boutique acheter où", ke:"shop store where", kr:"магазин где"},
+ // ---------- Voyage ----------
+ {cat:"Voyage", ce:"Маьждиг мичахь ду?", fr:"Où est la mosquée ?", k:"mosquée prière où trouver", ke:"mosque where", kr:"мечеть где"},
+ {cat:"Voyage", ce:"ХӀара некъ стенга боьду?", fr:"Où mène cette route ?", k:"route chemin direction mener", ke:"road where lead", kr:"дорога куда ведёт"},
+ {cat:"Voyage", ce:"Со Соьлжа-ГӀала воьду / йоьду", fr:"Je vais à Grozny (воьду homme / йоьду femme)", k:"aller grozny ville partir", ke:"going to grozny", kr:"еду в грозный иду"},
+ {cat:"Voyage", ce:"Машен мичахь ю?", fr:"Où est la voiture ?", k:"voiture auto où", ke:"car where", kr:"машина где"},
+ {cat:"Voyage", ce:"Гена дуй иза?", fr:"Est-ce loin ?", k:"loin distance proche", ke:"far distance", kr:"далеко ли"},
+ // ---------- Urgence ----------
+ {cat:"Urgence", ce:"ГӀо дехьа!", fr:"À l'aide ! Aide-moi !", k:"aide secours aider urgence", ke:"help emergency", kr:"помогите помощь на помощь"},
+ {cat:"Urgence", ce:"Суна гӏо оьшу", fr:"J'ai besoin d'aide", k:"aide besoin aider", ke:"need help", kr:"нужна помощь"},
+ {cat:"Urgence", ce:"ЦӀе яьлла!", fr:"Au feu ! (un incendie s'est déclaré)", k:"feu incendie brûler urgence", ke:"fire emergency", kr:"пожар горит"},
+ // ---------- Météo et heure ----------
+ {cat:"Météo et heure", ce:"Тахана дика де ду", fr:"Il fait beau aujourd'hui", k:"beau temps météo soleil journée", ke:"nice weather today", kr:"хорошая погода сегодня"},
+ {cat:"Météo et heure", ce:"ДогӀа догӀу", fr:"Il pleut", k:"pluie pleuvoir météo", ke:"raining rain", kr:"дождь идёт"},
+ {cat:"Météo et heure", ce:"Ло догӀу", fr:"Il neige", k:"neige neiger hiver météo", ke:"snowing snow", kr:"снег идёт"},
+ {cat:"Météo et heure", ce:"Шело ю", fr:"Il fait froid", k:"froid météo hiver", ke:"cold weather", kr:"холодно мороз"},
+ {cat:"Météo et heure", ce:"Йовхо ю", fr:"Il fait chaud", k:"chaud chaleur météo été", ke:"hot warm weather", kr:"жарко тепло"},
+ {cat:"Météo et heure", ce:"Маса сахьт даьлла?", fr:"Quelle heure est-il ?", k:"heure temps montre", ke:"what time", kr:"который час время сколько времени"},
+ // ---------- Hospitalité (suite) ----------
+ {cat:"Hospitalité", ce:"Чоьхьавала / чоьхьаяла", fr:"Entre ! (вала à un homme / яла à une femme)", k:"entrer inviter maison accueillir", ke:"come in enter", kr:"заходи входи"},
+ {cat:"Hospitalité", ce:"Охьахаа", fr:"Assieds-toi", k:"asseoir siège place", ke:"sit down", kr:"садись присаживайся"},
+ {cat:"Hospitalité", ce:"ХӀума яа", fr:"Mange, sers-toi", k:"manger table repas servir invité", ke:"eat food", kr:"кушай ешь угощайся"},
+ {cat:"Hospitalité", ce:"Чам болуш ду", fr:"C'est délicieux", k:"délicieux bon goût repas compliment", ke:"delicious tasty", kr:"вкусно"},
+ {cat:"Hospitalité", ce:"Со вузна ву / юзна ю", fr:"Je suis rassasié(e), merci (вузна homme / юзна femme)", k:"rassasié plein manger assez", ke:"full enough ate", kr:"наелся наелась сыт"},
+ // ---------- Conversation (suite) ----------
+ {cat:"Conversation", ce:"Керла хӏун ду?", fr:"Quoi de neuf ?", k:"nouvelles neuf quoi", ke:"what's new news", kr:"что нового новости"},
+ {cat:"Conversation", ce:"Муха ду гӏуллакхаш?", fr:"Comment vont les affaires ?", k:"affaires nouvelles aller", ke:"how things business", kr:"как дела"},
+ {cat:"Conversation", ce:"Ца оьшу, баркалла", fr:"Non merci, pas besoin", k:"non merci refuser besoin", ke:"no thanks need", kr:"не надо спасибо"},
+ {cat:"Conversation", ce:"Нийса ду", fr:"C'est exact / c'est vrai", k:"exact vrai juste correct raison", ke:"correct right true", kr:"правильно верно точно"},
+ {cat:"Conversation", ce:"Ма дика ду!", fr:"Comme c'est bien !", k:"bien super génial", ke:"how nice great", kr:"как хорошо здорово"},
+ {cat:"Conversation", ce:"Схьавола / схьаяла", fr:"Viens ici (вола homme / яла femme)", k:"venir ici appeler", ke:"come here", kr:"иди сюда подойди"},
+ {cat:"Conversation", ce:"Со дӀавоьду / дӀайоьду", fr:"Je m'en vais (воьду homme / йоьду femme)", k:"partir aller m'en vais quitter", ke:"i'm leaving going", kr:"я ухожу пошёл"},
+ // ---------- Salutations (suite) ----------
+ {cat:"Salutations", ce:"Гур ду вай", fr:"À bientôt / on se verra", k:"bientôt revoir au revoir", ke:"see you soon", kr:"увидимся до встречи"},
+ {cat:"Salutations", ce:"Кхана гур ду вай", fr:"À demain", k:"demain revoir", ke:"see you tomorrow", kr:"до завтра"},
+ // ---------- Vœux (suite) ----------
+ {cat:"Vœux et bénédictions", ce:"Дала мукъалахь", fr:"Si Dieu le veut (inchallah)", k:"inchallah espérer volonté dieu", ke:"god willing inshallah", kr:"даст бог если бог даст иншаллах"},
+ {cat:"Vœux et bénédictions", ce:"Винчу денца декъал войла хьо!", fr:"Joyeux anniversaire ! (à un homme)", k:"anniversaire fêter naissance souhaiter", ke:"happy birthday man", kr:"с днём рождения мужчине"},
+ {cat:"Vœux et bénédictions", ce:"Йинчу денца декъал йойла хьо!", fr:"Joyeux anniversaire ! (à une femme)", k:"anniversaire fêter naissance souhaiter femme", ke:"happy birthday woman", kr:"с днём рождения женщине"},
+ // ---------- Religion (suite) ----------
+ {cat:"Religion et fêtes", ce:"Дала къобал дойла", fr:"Que Dieu accepte (bonne action, prière, aumône)", k:"accepter dieu prière bonne action", ke:"may god accept", kr:"пусть аллах примет"}
 ];
