@@ -588,21 +588,21 @@ function situationSearch(v){
     const hayK=normFr([p.k||"",p.ke||"",p.kr||"",p.cat].join(" "));   // mots-clés de situation
     const hayT=normFr([p.ce,p.fr].join(" "));                          // texte de la fiche
     const toks=hayK.split(/\s+/).concat(hayT.split(/\s+/));
-    let s=0;
+    let s=0,cov=0;
     for(const w of words){
-      if(hayK.includes(w)){ s+=3; continue; }
-      if(hayT.includes(w)){ s+=2; continue; }
+      if(hayK.includes(w)){ s+=3; cov++; continue; }
+      if(hayT.includes(w)){ s+=2; cov++; continue; }
       let best=0;                                                      // racines proches : « saluer » ≈ « salutation »
       for(const t of toks){ const c=pref(t,w); if(c>best) best=c; }
-      if(best>=4&&best>=w.length-2) s+=1;
+      if(best>=4&&best>=Math.ceil(w.length*0.6)){ s+=1; cov++; }   // « travelling » ≈ « travel »
     }
-    if(s>0) scored.push([s,p]);
+    if(s>0) scored.push([cov,s,p]);
   }
-  scored.sort((a,b)=>b[0]-a[0]);
-  const top=scored[0]?scored[0][0]:0;
-  if(!top) return [];
-  const seuil=Math.max(1,top-1);
-  return scored.filter(x=>x[0]>=seuil).slice(0,8).map(x=>x[1]);
+  if(!scored.length) return [];
+  // priorité au nombre de mots de la question réellement couverts, puis à la force du lien
+  scored.sort((a,b)=>(b[0]-a[0])||(b[1]-a[1]));
+  const maxCov=scored[0][0];
+  return scored.filter(x=>x[0]===maxCov).slice(0,8).map(x=>x[2]);
 }
 (function(){
   const q=document.getElementById("phr-q"); if(!q) return;
@@ -1184,7 +1184,7 @@ const I18N={
   impReading:"Lecture de",impPrep:"Préparation de l'image…",
   impDone:"Texte extrait ({n} caractères). Relisez, corrigez si besoin, puis traduisez.",
   impNone:"Aucun texte détecté. S'il s'agit d'un scan, cochez « forcer l'OCR ».",err:"Erreur : ",ocrModel:"Téléchargement du modèle OCR…",
-  "cat:Faire connaissance":"Faire connaissance","cat:Famille":"Famille","cat:Santé":"Santé","cat:Achats":"Achats","cat:Urgence":"Urgence","cat:Météo et heure":"Météo et heure","cat:Salutations":"Salutations","cat:Vœux et bénédictions":"Vœux et bénédictions","cat:Hospitalité":"Hospitalité","cat:Événements de la vie":"Événements de la vie","cat:Religion et fêtes":"Religion et fêtes","cat:Respect des aînés":"Respect des aînés","cat:Voyage":"Voyage",phrQ:"Décrivez la situation… ex : quelqu\u2019un a acheté un nouvel habit",phrFound:"Expressions pour cette situation","cat:Politesse":"Politesse","cat:Base":"Base","cat:Conversation":"Conversation","cat:Langue":"Langue","cat:Sentiments":"Sentiments",
+  "cat:Directions":"Directions","cat:À l'hôtel":"À l'hôtel","cat:À table":"À table","cat:Couleurs":"Couleurs","cat:Jours et temps":"Jours et temps","cat:Loisirs":"Loisirs","cat:Faire connaissance":"Faire connaissance","cat:Famille":"Famille","cat:Santé":"Santé","cat:Achats":"Achats","cat:Urgence":"Urgence","cat:Météo et heure":"Météo et heure","cat:Salutations":"Salutations","cat:Vœux et bénédictions":"Vœux et bénédictions","cat:Hospitalité":"Hospitalité","cat:Événements de la vie":"Événements de la vie","cat:Religion et fêtes":"Religion et fêtes","cat:Respect des aînés":"Respect des aînés","cat:Voyage":"Voyage",phrQ:"Décrivez la situation… ex : quelqu\u2019un a acheté un nouvel habit",phrFound:"Expressions pour cette situation","cat:Politesse":"Politesse","cat:Base":"Base","cat:Conversation":"Conversation","cat:Langue":"Langue","cat:Sentiments":"Sentiments",
   numN:"Nombre",numCE:"Tchétchène",numTL:"Translit.",numST:"Structure",
   install:"Installer",copy:"Copier",copied:"Copié !",adapted1p:"adapté à la 1re personne (« je ») — ву pour un homme, ю pour une femme",badgeRule:"règle",histT:"Historique",histEmpty:"Aucun historique pour l\u2019instant.",histClear:"Effacer",ocrLow:"confiance faible : une photo droite, nette et bien éclairée d\u2019un texte imprimé donnera un bien meilleur résultat.",
   lblHand:"écriture manuscrite",advOpts:"Options",visNoKey:"L\u2019écriture manuscrite nécessite une clé Google Vision (gratuite, 1\u00a0000 images/mois). Créez-la sur console.cloud.google.com (API Vision \u2192 Identifiants \u2192 Clé API), puis collez-la ci-dessus : elle reste sur cet appareil.",
@@ -1218,7 +1218,7 @@ const I18N={
   impReading:"Чтение",impPrep:"Подготовка изображения…",
   impDone:"Текст извлечён ({n} знаков). Проверьте и переводите.",
   impNone:"Текст не обнаружен. Если это скан, включите «принудительный OCR».",err:"Ошибка: ",ocrModel:"Загрузка модели OCR…",
-  "cat:Faire connaissance":"Знакомство","cat:Famille":"Семья","cat:Santé":"Здоровье","cat:Achats":"Покупки","cat:Urgence":"Срочные случаи","cat:Météo et heure":"Погода и время","cat:Salutations":"Приветствия","cat:Vœux et bénédictions":"Пожелания и благословения","cat:Hospitalité":"Гостеприимство","cat:Événements de la vie":"События жизни","cat:Religion et fêtes":"Религия и праздники","cat:Respect des aînés":"Уважение к старшим","cat:Voyage":"Дорога",phrQ:"Опишите ситуацию… напр.: человек купил обновку",phrFound:"Выражения для этой ситуации","cat:Politesse":"Вежливость","cat:Base":"Основное","cat:Conversation":"Разговор","cat:Langue":"Язык","cat:Sentiments":"Чувства",
+  "cat:Directions":"Направления","cat:À l'hôtel":"В гостинице","cat:À table":"За столом","cat:Couleurs":"Цвета","cat:Jours et temps":"Дни и время","cat:Loisirs":"Досуг","cat:Faire connaissance":"Знакомство","cat:Famille":"Семья","cat:Santé":"Здоровье","cat:Achats":"Покупки","cat:Urgence":"Срочные случаи","cat:Météo et heure":"Погода и время","cat:Salutations":"Приветствия","cat:Vœux et bénédictions":"Пожелания и благословения","cat:Hospitalité":"Гостеприимство","cat:Événements de la vie":"События жизни","cat:Religion et fêtes":"Религия и праздники","cat:Respect des aînés":"Уважение к старшим","cat:Voyage":"Дорога",phrQ:"Опишите ситуацию… напр.: человек купил обновку",phrFound:"Выражения для этой ситуации","cat:Politesse":"Вежливость","cat:Base":"Основное","cat:Conversation":"Разговор","cat:Langue":"Язык","cat:Sentiments":"Чувства",
   numN:"Число",numCE:"Чеченский",numTL:"Транслит.",numST:"Структура",
   install:"Установить",copy:"Копировать",copied:"Скопировано!",adapted1p:"адаптировано к 1-му лицу («я») — ву для мужчины, ю для женщины",badgeRule:"правило",histT:"История",histEmpty:"История пока пуста.",histClear:"Очистить",ocrLow:"низкая уверенность: прямое, чёткое и хорошо освещённое фото печатного текста даст куда лучший результат.",
   lblHand:"рукописный текст",advOpts:"Параметры",visNoKey:"Для рукописного текста нужен ключ Google Vision (бесплатно, 1\u00a0000 изображений/мес). Создайте его на console.cloud.google.com и вставьте выше: он хранится на этом устройстве.",
@@ -1252,7 +1252,7 @@ const I18N={
   impReading:"Reading",impPrep:"Preparing image…",
   impDone:"Text extracted ({n} chars). Review, then translate.",
   impNone:"No text detected. If it is a scan, enable “force OCR”.",err:"Error: ",ocrModel:"Downloading OCR model…",
-  "cat:Faire connaissance":"Meeting people","cat:Famille":"Family","cat:Santé":"Health","cat:Achats":"Shopping","cat:Urgence":"Emergency","cat:Météo et heure":"Weather & time","cat:Salutations":"Greetings","cat:Vœux et bénédictions":"Wishes & blessings","cat:Hospitalité":"Hospitality","cat:Événements de la vie":"Life events","cat:Religion et fêtes":"Religion & holidays","cat:Respect des aînés":"Respect for elders","cat:Voyage":"Travel",phrQ:"Describe the situation… e.g. someone bought new clothes",phrFound:"Phrases for this situation","cat:Politesse":"Politeness","cat:Base":"Basics","cat:Conversation":"Conversation","cat:Langue":"Language","cat:Sentiments":"Feelings",
+  "cat:Directions":"Directions","cat:À l'hôtel":"At the hotel","cat:À table":"At the table","cat:Couleurs":"Colours","cat:Jours et temps":"Days & time","cat:Loisirs":"Leisure","cat:Faire connaissance":"Meeting people","cat:Famille":"Family","cat:Santé":"Health","cat:Achats":"Shopping","cat:Urgence":"Emergency","cat:Météo et heure":"Weather & time","cat:Salutations":"Greetings","cat:Vœux et bénédictions":"Wishes & blessings","cat:Hospitalité":"Hospitality","cat:Événements de la vie":"Life events","cat:Religion et fêtes":"Religion & holidays","cat:Respect des aînés":"Respect for elders","cat:Voyage":"Travel",phrQ:"Describe the situation… e.g. someone bought new clothes",phrFound:"Phrases for this situation","cat:Politesse":"Politeness","cat:Base":"Basics","cat:Conversation":"Conversation","cat:Langue":"Language","cat:Sentiments":"Feelings",
   numN:"Number",numCE:"Chechen",numTL:"Translit.",numST:"Structure",
   install:"Install",copy:"Copy",copied:"Copied!",adapted1p:"adapted to 1st person (\u201cI\u201d) \u2014 ву for a man, ю for a woman",badgeRule:"rule",histT:"History",histEmpty:"No history yet.",histClear:"Clear",ocrLow:"low confidence: a straight, sharp, well-lit photo of printed text will work much better.",
   lblHand:"handwriting",advOpts:"Options",visNoKey:"Handwriting needs a Google Vision key (free, 1,000 images/month). Create it at console.cloud.google.com and paste it above: it stays on this device.",
@@ -1269,7 +1269,7 @@ const I18N={
   phNum:"Терахь язде (0–999 999)",impTrad:"ХӀара йоза гочде →",sub:"Нохчийн мотт · нохчийн гочдархо",
   lnFr:"Французийн",lnCe:"Нохчийн",lnRu:"Оьрсийн",lnEn:"Ингалсан",
   docLang:"Документан мотт:",cardDict:"Дошам",cardExpr:"Аларш",badgeDict:"дошам",
-  "cat:Faire connaissance":"Вовшахкхетар","cat:Famille":"Доьзал","cat:Santé":"Могашалла","cat:Achats":"Эцар","cat:Urgence":"ГӀо","cat:Météo et heure":"Хенан хӀоттам","cat:Salutations":"Маршалла","cat:Hospitalité":"Хьошалла","cat:Voyage":"Некъ","cat:Langue":"Мотт",numCE:"Нохчийн",numN:"Терахь"}
+  "cat:Directions":"АгӀонаш","cat:À l'hôtel":"ХьешацӀа","cat:À table":"Кхача","cat:Couleurs":"Беснаш","cat:Jours et temps":"Денош а, хан а","cat:Loisirs":"Синкъерам","cat:Faire connaissance":"Вовшахкхетар","cat:Famille":"Доьзал","cat:Santé":"Могашалла","cat:Achats":"Эцар","cat:Urgence":"ГӀо","cat:Météo et heure":"Хенан хӀоттам","cat:Salutations":"Маршалла","cat:Hospitalité":"Хьошалла","cat:Voyage":"Некъ","cat:Langue":"Мотт",numCE:"Нохчийн",numN:"Терахь"}
 };
 function T(k){
   const l=I18N[CURLANG]||{};
@@ -1416,7 +1416,7 @@ histWire("btn-hist-d","hist-d","nm_h_dico",it=>{
 })();
 
 /* ---------- version visible (diagnostic cache) ---------- */
-(function(){const v=document.getElementById("ver");if(v)v.textContent="· v48";})();
+(function(){const v=document.getElementById("ver");if(v)v.textContent="· v49";})();
 
 /* ---------- PWA ---------- */
 if("serviceWorker" in navigator && location.protocol.startsWith("http")){
