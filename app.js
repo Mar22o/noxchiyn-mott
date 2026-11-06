@@ -483,11 +483,11 @@ async function doTranslate(){
     box.className="card";
     box.innerHTML=`<p class="hint">${T("mtQuery")}</p>`;
     out.appendChild(box);
-    const aik=aiKey();
-    aiErr = aik ? "" : "aucune cle configuree";
+    const aik=aiUrl();
+    aiErr = aik ? "" : "relais non configure";
     if(aik){
       try{
-        const gt=await geminiTranslate(q.slice(0,2000),src,dst,aik);
+        const gt=await geminiTranslate(q.slice(0,2000),src,dst);
         if(!gt||!gt.main) aiErr="reponse vide";
         if(gt&&gt.main){
           box.className="card";
@@ -832,14 +832,13 @@ async function ocrImage(src,lang){
 /* ---------- OCR manuscrit par IA (Gemini) ---------- */
 const VIS_SESSION_MAX=15;         // OCR manuscrits maximum par session (remis à 0 au rechargement)
 let visSession=0, lastImageFile=null;
-function aiKey(){ return (window.NM_AI_KEY||""); }
+function aiUrl(){ return (window.NM_API_URL||""); }   // relais : aucune cle dans le navigateur
 /* ---------- OCR par IA (Gemini) : comprend le tchétchène, bien meilleur sur le manuscrit ---------- */
 async function fileToB64(file){
   return new Promise((res,rej)=>{const r=new FileReader();
     r.onload=()=>res(String(r.result).split(",")[1]); r.onerror=rej; r.readAsDataURL(file);});
 }
-async function geminiOcr(file,key){
-  const model=(window.NM_OCR_MODEL||"gemini-2.5-flash");
+async function geminiOcr(file){
   const b64=await fileToB64(file);
   const prompt="Transcris fidelement, caractere par caractere, le texte manuscrit de cette image. "
     +"Le texte est en tchetchene (alphabet cyrillique, avec la lettre palotchka \u0406/\u04cf), et parfois en russe ou en anglais. "
@@ -847,7 +846,7 @@ async function geminiOcr(file,key){
     +"Ne traduis rien. Ne mets aucun commentaire ni explication : reponds uniquement par le texte transcrit.";
   const body={contents:[{parts:[{text:prompt},{inline_data:{mime_type:(file.type||"image/jpeg"),data:b64}}]}],
     generationConfig:{temperature:0}};
-  const resp=await fetch("https://generativelanguage.googleapis.com/v1beta/models/"+model+":generateContent?key="+encodeURIComponent(key),
+  const resp=await fetch(aiUrl(),
     {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
   const j=await resp.json();
   if(j.error) throw new Error(j.error.message||"Gemini");
@@ -930,9 +929,8 @@ function transHints(q,src){
   }
   return hints.slice(0,20);
 }
-async function geminiTranslate(q,src,dst,key){
+async function geminiTranslate(q,src,dst){
   const L={fr:"français",ce:"tchétchène (нохчийн мотт, alphabet cyrillique)",ru:"russe",en:"anglais"};
-  const model=(window.NM_OCR_MODEL||"gemini-2.5-flash");
   const hints=transHints(q,src);
   let prompt="Tu es un traducteur expert du tchétchène. Traduis du "+L[src]+" vers le "+L[dst]+" la phrase suivante, de manière naturelle et grammaticalement correcte.";
   if(dst==="ce"){
@@ -970,7 +968,7 @@ async function geminiTranslate(q,src,dst,key){
   prompt+=" Donne la MEILLEURE traduction, puis 2 autres variantes correctes possibles (formulations ou synonymes différents).";
   prompt+=" Réponds STRICTEMENT en JSON, sans texte autour : {\"principale\":\"...\",\"variantes\":[\"...\",\"...\"]}.\n\nPhrase : "+q;
   const body={contents:[{parts:[{text:prompt}]}],generationConfig:{temperature:0.5,responseMimeType:"application/json"}};
-  const resp=await fetch("https://generativelanguage.googleapis.com/v1beta/models/"+model+":generateContent?key="+encodeURIComponent(key),
+  const resp=await fetch(aiUrl(),
     {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
   const j=await resp.json();
   if(j.error) throw new Error(j.error.message||"Gemini");
@@ -1054,7 +1052,7 @@ function finishText(text){
 // bouton « OCR avancé » (manuscrit) — affiché après l'OCR gratuit, à la demande de l'utilisateur
 function renderRetry(){
   const box=$("imp-retry"); if(!box) return;
-  if(!lastImageFile||!aiKey()){ box.innerHTML=""; return; }
+  if(!lastImageFile||!aiUrl()){ box.innerHTML=""; return; }
   if(visSession>=VIS_SESSION_MAX){ box.innerHTML=`<p class="hint">${T("ocrLimit")}</p>`; return; }
   box.innerHTML=`<button id="imp-adv-btn" class="copy-btn">🔍 ${T("ocrRetry")}</button>`
     +`<p class="hint">${T("ocrRetryHint").replace("{n}",VIS_SESSION_MAX-visSession)}</p>`;
@@ -1062,10 +1060,10 @@ function renderRetry(){
 }
 async function runAdvanced(){
   if(!lastImageFile||visSession>=VIS_SESSION_MAX) return;
-  const key=aiKey(); if(!key) return;
+  if(!aiUrl()) return;
   const box=$("imp-retry"); box.innerHTML=`<p class="hint">${T("ocrAdvRun")}</p>`;
   try{
-    const vt=await geminiOcr(lastImageFile,key);   // IA qui comprend le tchétchène
+    const vt=await geminiOcr(lastImageFile);   // IA qui comprend le tchétchène
     visSession++;
     $("imp-text").value=finishText(vt);
     let msg=T("ocrAdv");
@@ -1416,7 +1414,7 @@ histWire("btn-hist-d","hist-d","nm_h_dico",it=>{
 })();
 
 /* ---------- version visible (diagnostic cache) ---------- */
-(function(){const v=document.getElementById("ver");if(v)v.textContent="· v49";})();
+(function(){const v=document.getElementById("ver");if(v)v.textContent="· v50";})();
 
 /* ---------- PWA ---------- */
 if("serviceWorker" in navigator && location.protocol.startsWith("http")){
