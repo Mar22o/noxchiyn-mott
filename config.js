@@ -1,17 +1,17 @@
 // ===================================================================
-//  Cle Google Gemini — OCR manuscrit ET traduction de phrases par IA.
+//  Configuration publique de Noxchiyn Mott.
 //
-//  La cle est publique dans le code : protegez-la cote Google par
-//    1) une restriction de site : noxchiynmott.com/*
-//    2) l'API "Generative Language API" activee
-//    3) un plafond de depense (alerte de budget)
+//  IMPORTANT : ce fichier est visible par tout le monde.
+//  Il ne doit JAMAIS contenir de cle API.
 //
-//  >>> Collez votre cle Gemini (AI Studio) entre les guillemets, puis televersez. <<<
+//  La cle Gemini vit uniquement dans le relais Cloudflare (worker.js),
+//  ou elle est stockee comme secret et reste invisible.
+//  Ici on ne met que l'adresse publique du relais, qui est inoffensive.
+//
+//  >>> Collez l'adresse de votre Worker entre les guillemets. <<<
+//      exemple : https://noxchiyn-relais.VOTRE-NOM.workers.dev
 // ===================================================================
-window.NM_AI_KEY = "AIzaSyC7952IAWqqxOdtHZP5HrEbxHyYQ09PTlA";
-
-// Modele IA (laisser tel quel ; a changer seulement si Google le renomme un jour)
-window.NM_OCR_MODEL = "gemini-2.5-flash";
+window.NM_API_URL = "";
 
 // Adresse qui recoit les signalements de "mauvaise traduction"
 window.NM_REPORT_EMAIL = "mar22o@proton.me";
